@@ -1,0 +1,43 @@
+git init
+git status
+git status -s
+
+git add
+git add -A
+
+git commit
+git commit -a
+git commit -m message
+git commit --ammend
+
+del file
+git rm --cached file
+git rm file
+
+git log
+git log -3
+git log -p
+git log --pretty=oneline
+git log --relative-date
+
+git ls-tree master -r (tracked files)
+git ls-tree master -r --name-only   
+
+git branch
+git branch --merged
+git branch --unmerged
+git branch -r			(list remote branches)
+
+git branch hotfix01
+git checkout hotfix01
+git checkout -b hotfix01		(create and checkout)
+git checkout --track origin/hotfix01     (create, checkout and track remote)
+
+git merge alt
+
+git checkout <commit>    (detaches head)
+git checkout <commit> <file>   (does not detach head)
+git checkout <file>  (unmodify)
+git reset   (unstage)   
+git reset --hard (unstage and ummodify)
+
