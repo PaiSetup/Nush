@@ -8,6 +8,7 @@ class IllegalState(Exception):
 
 
 class AudioSwitch:
+    NIRCMD = "nircmd.exe"
     FILE = 'config.txt'
     MESSAGE_NO_DEVICES = "At least one device should be specified in {}".format(FILE)
     MESSAGE_NO_FILE = "Create file named {} containing names of devices you want to swap over".format(FILE)
@@ -24,7 +25,7 @@ class AudioSwitch:
 
     @staticmethod
     def _check_dependencies():
-        if os.system('where nircmd.exe') != 0:
+        if os.system('where {}'.format(AudioSwitch.NIRCMD)) != 0:
                 raise IllegalState(AudioSwitch.MESSAGE_NO_NIRCMD)
 
     @staticmethod
@@ -59,9 +60,9 @@ class AudioSwitch:
     def _set_device(self, index):
         self._current_device = index
         device = self._devices[self._current_device]
-        os.system('nircmd setdefaultsounddevice {0} 0'
-                  'nircmd setdefaultsounddevice {0} 1'
-                  'nircmd setdefaultsounddevice {0} 2'.format(device))
+        os.system('{0} setdefaultsounddevice "{1}" 0'
+                  '{0} setdefaultsounddevice "{1}" 1'
+                  '{0} setdefaultsounddevice "{1}" 2'.format(AudioSwitch.NIRCMD, device))
 
         try:
             with open(AudioSwitch.FILE, 'w') as file:
