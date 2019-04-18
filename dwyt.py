@@ -13,9 +13,9 @@ class ThreadManager:
     def start_thread(self, target, *args, **kwargs):
         with self.condition_variable:
             # Wait for and acquire index of available thread in list
-            while not self.is_thread_available():
+            while not self._is_thread_available():
                 self.condition_variable.wait()
-            index = self.get_available_thread_index()
+            index = self._get_available_thread_index()
 
             # Ensure thread is really done by joining
             if self.threads[index] is not None:
@@ -23,7 +23,7 @@ class ThreadManager:
 
             # Schedule new thread
             kwargs['thread_index'] = index
-            self.threads[index] = Thread(target=self.wrap_target_function(target), args=args, kwargs=kwargs)
+            self.threads[index] = Thread(target=self._wrap_target_function(target), args=args, kwargs=kwargs)
             self.threads[index].start()
 
     def __enter__(self):
@@ -34,16 +34,16 @@ class ThreadManager:
             if thread is not None:
                 thread.join()
 
-    def get_available_thread_index(self):
+    def _get_available_thread_index(self):
         for index, thread in enumerate(self.threads):
             if thread is None or not thread.is_alive():
                 return index
         return None
 
-    def is_thread_available(self):
-        return self.get_available_thread_index() is not None
+    def _is_thread_available(self):
+        return self._get_available_thread_index() is not None
 
-    def wrap_target_function(self, target):
+    def _wrap_target_function(self, target):
         def wrapped_target(*args, **kwargs):
             target(*args, **kwargs)
             with self.condition_variable:
@@ -56,22 +56,22 @@ class YtDownloader:
         self.thread_count = thread_count
 
     def download_videos_concurrently(self, urls, output_dir):
-        self.ensure_output_dir_is_present(output_dir)
+        self._ensure_output_dir_is_present(output_dir)
         print("Downloading {} videos in {} threads".format(len(urls), self.thread_count))
         with ThreadManager(self.thread_count) as thread_manager:
             for url in urls:
-                thread_manager.start_thread(YtDownloader.download_video, url, output_dir)
+                thread_manager.start_thread(YtDownloader._download_video, url, output_dir)
         print("Done")
 
     @staticmethod
-    def ensure_output_dir_is_present(output_dir):
+    def _ensure_output_dir_is_present(output_dir):
         try:
             mkdir(output_dir)
         except OSError:
             pass  # directory already exists
 
     @staticmethod
-    def download_video(url, output_dir, thread_index):
+    def _download_video(url, output_dir, thread_index):
         try:
             video = YouTube(url) \
                 .streams \
