@@ -1,5 +1,6 @@
 from os import mkdir
 from threading import Thread, Condition, Event, Lock
+from enum import Enum
 
 from pytube import YouTube
 
@@ -105,33 +106,57 @@ def ensure_output_dir_is_present(output_dir):
     except OSError:
         pass  # directory already exists
 
+class FileType(Enum):
+    video = "video"
+    audio = "audio"
 
-def download_video(url, output_dir, logger, thread_index):
+    @staticmethod
+    def from_string(string, default_file_type):
+        for enum in FileType:
+            if enum.value == string:
+                return enum
+        return default_file_type
+
+def download_video(url, file_type, output_dir, logger, thread_index):
+    def filter_and_sort_streams(streams):
+        if file_type is FileType.video:
+            filter_attributes = { "progressive": True, "file_extension": "mp4"}
+            sort_attribute = "resolution"
+        elif file_type is FileType.audio:
+            filter_attributes = { "only_audio": True, "file_extension": "mp4"}
+            sort_attribute = "abr"
+        else:
+            raise Exception("Invalid type")
+        filtered_streams = streams.filter(**filter_attributes)
+        sorted_streams = filtered_streams.order_by(sort_attribute).desc()
+        return sorted_streams
+
     try:
-        video = YouTube(url) \
-            .streams \
-            .filter(progressive=True, file_extension='mp4') \
-            .order_by('resolution') \
-            .desc() \
-            .first()
-    except Exception:
+        all_streams = YouTube(url).streams
+        selected_stream = filter_and_sort_streams(all_streams).first()
+    except Exception as e:
         logger.log("\tthread={}: Error downloading \"{}\"".format(thread_index, url))
     else:
-        logger.log("\tthread={}: Downloading \"{}\" - \"{}\"".format(thread_index, url, video.default_filename))
-        video.download(output_path=output_dir)
+        logger.log("\tthread={}: Downloading \"{}\" - \"{}\"".format(thread_index, url, selected_stream.default_filename))
+        selected_stream.download(output_path=output_dir)
 
 
-def print_help(thread_count, output_dir):
+def print_help(**kwargs):
     print("DWYT - download youtube")
-    print("thread_count={}, output_dir={}".format(thread_count, output_dir))
+    print("Parameters:")
+    for parameter_name, parameter_value in kwargs.items():
+        print("\t{} = {}".format(parameter_name,parameter_value))
     print("Valid inputs:")
     print("\tUrl (starting with https)")
     print("\tFile name - file with urls in each line")
+    print("Line can have options appended after the url. Available options:")
+    print("\tvideo")
+    print("\taudio")
     print()
     print("Input any number of valid input lines and confirm with <Enter>:")
 
 
-def query_urls():
+def query_lines():
     while True:
         print('\t', end='')
         line = input()
@@ -147,19 +172,27 @@ def query_urls():
                 for line in file.read().splitlines():
                     yield line
 
-def filter_comments(lines):
-    return (line for line in lines if not line.startswith('#'))
+def parse_lines(lines, default_file_type):
+    for line in lines:
+        if line.startswith('#'):
+            continue
+
+        tokens = line.split()
+        url = tokens[0]
+        file_type = FileType.from_string(tokens[1], default_file_type) if len(tokens) > 1 else default_file_type
+        yield url, file_type
 
 def main():
-    thread_count = 3
+    thread_count = 5
     output_dir = "yt"
+    default_file_type = FileType.video
 
-    print_help(thread_count, output_dir)
+    print_help(thread_count=thread_count, output_dir=output_dir, default_file_type=default_file_type)
     ensure_output_dir_is_present(output_dir)
     logger = DeferredLogger()
     with ThreadManager(thread_count) as thread_manager:
-        for url in filter_comments(query_urls()):
-            thread_manager.schedule_task(download_video, url, output_dir, logger)
+        for url, file_extension in parse_lines(query_lines(), default_file_type):
+            thread_manager.schedule_task(download_video, url, file_extension, output_dir, logger)
     print("Done")
     logger.output_logs()
 
