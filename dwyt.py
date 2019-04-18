@@ -36,8 +36,9 @@ class ThreadManager:
             self._notify_dispatcher()
 
     def _dispatcher_wait_predicate(self):
-        can_dispatch = len(self._scheduled_tasks) != 0 and self._get_available_thread_index() is not None
-        return self._dispatcher_shutdown.is_set() or can_dispatch
+        has_task = len(self._scheduled_tasks) > 0
+        has_thread = self._get_available_thread_index() is not None
+        return (has_task and has_thread) or (not has_task and self._dispatcher_shutdown.is_set())
 
     def _notify_dispatcher(self):
         with self._dispatcher_notify:
@@ -49,23 +50,22 @@ class ThreadManager:
                 # wait for notification
                 self._dispatcher_notify.wait_for(self._dispatcher_wait_predicate)
 
-                # shutdown dispatcher thread
-                if self._dispatcher_shutdown.is_set():
+                if len(self._scheduled_tasks) > 0:
+                    # Find task and thread to perform it
+                    scheduled_task = self._scheduled_tasks.pop(0)
+                    index = self._get_available_thread_index()
+
+                    # Ensure thread is really done by joining it
+                    if self._threads[index] is not None:
+                        self._threads[index].join()
+
+                    # Start thread
+                    self._threads[index] = scheduled_task
+                    self._threads[index]._kwargs['thread_index'] = index
+                    self._threads[index].start()
+
+                elif self._dispatcher_shutdown.is_set():
                     return
-
-                # Find task and thread to perform it
-                scheduled_task = self._scheduled_tasks.pop(0)
-                index = self._get_available_thread_index()
-
-                # Ensure thread is really done by joining it
-                if self._threads[index] is not None:
-                    self._threads[index].join()
-
-                # Start thread
-                self._threads[index] = scheduled_task
-                self._threads[index]._kwargs['thread_index'] = index
-                self._threads[index].start()
-
 
     def __enter__(self):
         self._dispatcher.start()
