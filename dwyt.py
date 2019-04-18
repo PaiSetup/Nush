@@ -51,68 +51,62 @@ class ThreadManager:
         return wrapped_target
 
 
-class YtDownloader:
-    def __init__(self, thread_count=6):
-        self.thread_count = thread_count
+def ensure_output_dir_is_present(output_dir):
+    try:
+        mkdir(output_dir)
+    except OSError:
+        pass  # directory already exists
 
-    def download_videos_concurrently(self, urls, output_dir):
-        self._ensure_output_dir_is_present(output_dir)
-        print("Downloading {} videos in {} threads".format(len(urls), self.thread_count))
-        with ThreadManager(self.thread_count) as thread_manager:
-            for url in urls:
-                thread_manager.start_thread(YtDownloader._download_video, url, output_dir)
-        print("Done")
 
-    @staticmethod
-    def _ensure_output_dir_is_present(output_dir):
-        try:
-            mkdir(output_dir)
-        except OSError:
-            pass  # directory already exists
+def download_video(url, output_dir, thread_index):
+    try:
+        video = YouTube(url) \
+            .streams \
+            .filter(progressive=True, file_extension='mp4') \
+            .order_by('resolution') \
+            .desc() \
+            .first()
+    except Exception:
+        print("\tthread={}: Error downloading \"{}\"".format(thread_index, url))
+    else:
+        print("\tthread={}: Downloading \"{}\" - \"{}\"".format(thread_index, url, video.default_filename))
+        video.download(output_path=output_dir)
 
-    @staticmethod
-    def _download_video(url, output_dir, thread_index):
-        try:
-            video = YouTube(url) \
-                .streams \
-                .filter(progressive=True, file_extension='mp4') \
-                .order_by('resolution') \
-                .desc() \
-                .first()
-        except Exception:
-            print("\tthread={}: Error downloading \"{}\"".format(thread_index, url))
-        else:
-            print("\tthread={}: Downloading \"{}\" - \"{}\"".format(thread_index, url, video.default_filename))
-            video.download(output_path=output_dir)
+
+def print_help(thread_count, output_dir):
+    print("DWYT - download youtube")
+    print("thread_count={}, output_dir={}".format(thread_count, output_dir))
+    print("Valid inputs:")
+    print("\tUrl (starting with https)")
+    print("\tFile name - file with urls in each line")
+    print()
+    print("Input any number of valid input lines and confirm with <Enter>:")
 
 
 def query_urls():
-    print ("DWYT - download youtube")
-    print ("Valid inputs:")
-    print ("\tUrl (starting with https)")
-    print ("\tFile name - file with urls in each line")
-    print ()
-    print ("Input any number of valid input lines and confirm with <Enter>:")
-    urls = []
     while True:
         print('\t', end='')
         line = input()
         if line == "":
-            break
+            return
 
         if line.startswith("https://"):
             # Single url
-            urls.append(line)
+            yield line
         else:
             # File with urls
             with open(line) as file:
-                lines = file.read().splitlines()
-            lines = [line for line in lines if line.startswith("https://")]
-            urls = urls + lines
-    return urls
+                for line in file.read().splitlines():
+                    yield line
 
 
 if __name__ == '__main__':
-    downloader = YtDownloader()
-    downloader.download_videos_concurrently(query_urls(), output_dir="yt")
-    input("Press <Enter>");
+    thread_count = 1
+    output_dir = "yt"
+
+    print_help(thread_count, output_dir)
+    ensure_output_dir_is_present(output_dir)
+    with ThreadManager(thread_count) as thread_manager:
+        for url in query_urls():
+            thread_manager.start_thread(download_video, url, output_dir)
+    print("Done")
