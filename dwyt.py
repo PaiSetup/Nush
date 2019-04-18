@@ -1,7 +1,21 @@
 from os import mkdir
-from threading import Thread, Condition, Event
+from threading import Thread, Condition, Event, Lock
 
 from pytube import YouTube
+
+class DeferredLogger:
+    def __init__(self):
+        self._lock = Lock()
+        self._lines = []
+
+    def log(self, line):
+        with self._lock:
+            self._lines.append(line)
+
+    def output_logs(self):
+        with self._lock:
+            for line in self._lines:
+                print(line)
 
 
 class ThreadManager:
@@ -85,7 +99,7 @@ def ensure_output_dir_is_present(output_dir):
         pass  # directory already exists
 
 
-def download_video(url, output_dir, thread_index):
+def download_video(url, output_dir, logger, thread_index):
     try:
         video = YouTube(url) \
             .streams \
@@ -94,9 +108,9 @@ def download_video(url, output_dir, thread_index):
             .desc() \
             .first()
     except Exception:
-        print("\tthread={}: Error downloading \"{}\"".format(thread_index, url))
+        logger.log("\tthread={}: Error downloading \"{}\"".format(thread_index, url))
     else:
-        print("\tthread={}: Downloading \"{}\" - \"{}\"".format(thread_index, url, video.default_filename))
+        logger.log("\tthread={}: Downloading \"{}\" - \"{}\"".format(thread_index, url, video.default_filename))
         video.download(output_path=output_dir)
 
 
@@ -130,12 +144,14 @@ def filter_comments(lines):
     return (line for line in lines if not line.startswith('#'))
 
 if __name__ == '__main__':
-    thread_count = 1
+    thread_count = 3
     output_dir = "yt"
 
     print_help(thread_count, output_dir)
     ensure_output_dir_is_present(output_dir)
+    logger = DeferredLogger()
     with ThreadManager(thread_count) as thread_manager:
         for url in filter_comments(query_urls()):
-            thread_manager.schedule_task(download_video, url, output_dir)
+            thread_manager.schedule_task(download_video, url, output_dir, logger)
     print("Done")
+    logger.output_logs()
