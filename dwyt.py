@@ -33,22 +33,18 @@ class ThreadManager:
         task = Thread(target=self._wrap_target_function(target), args=args, kwargs=kwargs)
         with self._dispatcher_notify:
             self._scheduled_tasks.append(task)
-            self._notify_dispatcher()
-
-    def _dispatcher_wait_predicate(self):
-        has_task = len(self._scheduled_tasks) > 0
-        has_thread = self._get_available_thread_index() is not None
-        return (has_task and has_thread) or (not has_task and self._dispatcher_shutdown.is_set())
-
-    def _notify_dispatcher(self):
-        with self._dispatcher_notify:
             self._dispatcher_notify.notify()
 
     def _dispatcher_routine(self):
+        def wait_predicate():
+            has_task = len(self._scheduled_tasks) > 0
+            has_thread = self._get_available_thread_index() is not None
+            return (has_task and has_thread) or (not has_task and self._dispatcher_shutdown.is_set())
+
         while True:
             with self._dispatcher_notify:
                 # wait for notification
-                self._dispatcher_notify.wait_for(self._dispatcher_wait_predicate)
+                self._dispatcher_notify.wait_for(wait_predicate)
 
                 if len(self._scheduled_tasks) > 0:
                     # Find task and thread to perform it
@@ -75,7 +71,7 @@ class ThreadManager:
         # Shut down dispatcher thread
         self._dispatcher_shutdown.set()
         with self._dispatcher_notify:
-            self._notify_dispatcher()
+            self._dispatcher_notify.notify()
         self._dispatcher.join()
 
         # Join all threads
@@ -93,7 +89,7 @@ class ThreadManager:
         def wrapped_target(*args, **kwargs):
             target(*args, **kwargs)
             with self._dispatcher_notify:
-                self._notify_dispatcher()
+                self._dispatcher_notify.notify()
         return wrapped_target
 
 
