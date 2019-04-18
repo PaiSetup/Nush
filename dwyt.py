@@ -28,7 +28,6 @@ class ThreadManager:
         self._dispatcher = Thread(target=self._dispatcher_routine)
         self._dispatcher_shutdown = Event()
         self._dispatcher_notify = Condition()
-        self._dispatcher_notify_counter = 0
 
     def schedule_task(self, target, *args, **kwargs):
         task = Thread(target=self._wrap_target_function(target), args=args, kwargs=kwargs)
@@ -37,12 +36,11 @@ class ThreadManager:
             self._notify_dispatcher()
 
     def _dispatcher_wait_predicate(self):
-        can_dispatch = len(self._scheduled_tasks) != 0 and self._get_available_thread_index() is not None and self._dispatcher_notify_counter != 0
+        can_dispatch = len(self._scheduled_tasks) != 0 and self._get_available_thread_index() is not None
         return self._dispatcher_shutdown.is_set() or can_dispatch
 
     def _notify_dispatcher(self):
         with self._dispatcher_notify:
-            self._dispatcher_notify_counter += 1
             self._dispatcher_notify.notify()
 
     def _dispatcher_routine(self):
@@ -67,7 +65,6 @@ class ThreadManager:
                 self._threads[index] = scheduled_task
                 self._threads[index]._kwargs['thread_index'] = index
                 self._threads[index].start()
-                self._dispatcher_notify_counter -= 1
 
 
     def __enter__(self):
@@ -183,7 +180,7 @@ def parse_lines(lines, default_file_type):
         yield url, file_type
 
 def main():
-    thread_count = 5
+    thread_count = 3
     output_dir = "yt"
     default_file_type = FileType.video
 
