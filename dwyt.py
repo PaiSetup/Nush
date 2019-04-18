@@ -150,7 +150,7 @@ def query_urls():
 def filter_comments(lines):
     return (line for line in lines if not line.startswith('#'))
 
-if __name__ == '__main__':
+def main():
     thread_count = 3
     output_dir = "yt"
 
@@ -162,3 +162,6 @@ if __name__ == '__main__':
             thread_manager.schedule_task(download_video, url, output_dir, logger)
     print("Done")
     logger.output_logs()
+
+if __name__ == '__main__':
+    main()
