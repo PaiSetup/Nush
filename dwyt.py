@@ -1,53 +1,80 @@
 from os import mkdir
-from threading import Thread, Condition
+from threading import Thread, Condition, Event
 
 from pytube import YouTube
 
 
 class ThreadManager:
     def __init__(self, thread_count):
-        self.thread_count = thread_count
-        self.threads = [None] * thread_count
-        self.condition_variable = Condition()
+        self._thread_count = thread_count
+        self._threads = [None] * thread_count
 
-    def start_thread(self, target, *args, **kwargs):
-        with self.condition_variable:
-            # Wait for and acquire index of available thread in list
-            while not self._is_thread_available():
-                self.condition_variable.wait()
-            index = self._get_available_thread_index()
+        self._scheduled_tasks = []
+        self._dispatcher = Thread(target=self._dispatcher_routine)
+        self._dispatcher_shutdown = Event()
+        self._dispatcher_notify = Condition()
 
-            # Ensure thread is really done by joining
-            if self.threads[index] is not None:
-                self.threads[index].join()
+    def schedule_task(self, target, *args, **kwargs):
+        task = Thread(target=self._wrap_target_function(target), args=args, kwargs=kwargs)
+        with self._dispatcher_notify:
+            self._scheduled_tasks.append(task)
+            self._dispatcher_notify.notify()
 
-            # Schedule new thread
-            kwargs['thread_index'] = index
-            self.threads[index] = Thread(target=self._wrap_target_function(target), args=args, kwargs=kwargs)
-            self.threads[index].start()
+    def _dispatcher_routine(self):
+        while True:
+            with self._dispatcher_notify:
+                # wait for notification
+                self._dispatcher_notify.wait()
+
+                # shutdown dispatcher thread
+                if self._dispatcher_shutdown.is_set():
+                    return
+
+                # Find scheduled task
+                if len(self._scheduled_tasks) == 0:
+                    continue # Spurious wake-up: no tasks to dispatch
+                scheduled_task = self._scheduled_tasks.pop(0)
+
+                # Find first thread that's not working and job for it
+                index = self._get_available_thread_index()
+                if index is None:
+                     continue # Spurious wake-up: no available thread
+                if self._threads[index] is not None:
+                    self._threads[index].join()
+
+                # Start thread
+                self._threads[index] = scheduled_task
+                self._threads[index]._kwargs['thread_index'] = index
+                self._threads[index].start()
+
 
     def __enter__(self):
+        self._dispatcher.start()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        for thread in self.threads:
+        # Shut down dispatcher thread
+        self._dispatcher_shutdown.set()
+        with self._dispatcher_notify:
+            self._dispatcher_notify.notify()
+        self._dispatcher.join()
+
+        # Join all threads
+        for thread in self._threads:
             if thread is not None:
                 thread.join()
 
     def _get_available_thread_index(self):
-        for index, thread in enumerate(self.threads):
+        for index, thread in enumerate(self._threads):
             if thread is None or not thread.is_alive():
                 return index
         return None
 
-    def _is_thread_available(self):
-        return self._get_available_thread_index() is not None
-
     def _wrap_target_function(self, target):
         def wrapped_target(*args, **kwargs):
             target(*args, **kwargs)
-            with self.condition_variable:
-                self.condition_variable.notify()
+            with self._dispatcher_notify:
+                self._dispatcher_notify.notify()
         return wrapped_target
 
 
@@ -99,6 +126,8 @@ def query_urls():
                 for line in file.read().splitlines():
                     yield line
 
+def filter_comments(lines):
+    return (line for line in lines if not line.startswith('#'))
 
 if __name__ == '__main__':
     thread_count = 1
@@ -107,6 +136,6 @@ if __name__ == '__main__':
     print_help(thread_count, output_dir)
     ensure_output_dir_is_present(output_dir)
     with ThreadManager(thread_count) as thread_manager:
-        for url in query_urls():
-            thread_manager.start_thread(download_video, url, output_dir)
+        for url in filter_comments(query_urls()):
+            thread_manager.schedule_task(download_video, url, output_dir)
     print("Done")
