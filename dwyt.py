@@ -27,32 +27,38 @@ class ThreadManager:
         self._dispatcher = Thread(target=self._dispatcher_routine)
         self._dispatcher_shutdown = Event()
         self._dispatcher_notify = Condition()
+        self._dispatcher_notify_counter = 0
 
     def schedule_task(self, target, *args, **kwargs):
         task = Thread(target=self._wrap_target_function(target), args=args, kwargs=kwargs)
         with self._dispatcher_notify:
             self._scheduled_tasks.append(task)
+            self._notify_dispatcher()
+
+    def _dispatcher_wait_predicate(self):
+        can_dispatch = len(self._scheduled_tasks) != 0 and self._get_available_thread_index() is not None and self._dispatcher_notify_counter != 0
+        return self._dispatcher_shutdown.is_set() or can_dispatch
+
+    def _notify_dispatcher(self):
+        with self._dispatcher_notify:
+            self._dispatcher_notify_counter += 1
             self._dispatcher_notify.notify()
 
     def _dispatcher_routine(self):
         while True:
             with self._dispatcher_notify:
                 # wait for notification
-                self._dispatcher_notify.wait()
+                self._dispatcher_notify.wait_for(self._dispatcher_wait_predicate)
 
                 # shutdown dispatcher thread
                 if self._dispatcher_shutdown.is_set():
                     return
 
-                # Find scheduled task
-                if len(self._scheduled_tasks) == 0:
-                    continue # Spurious wake-up: no tasks to dispatch
+                # Find task and thread to perform it
                 scheduled_task = self._scheduled_tasks.pop(0)
-
-                # Find first thread that's not working and job for it
                 index = self._get_available_thread_index()
-                if index is None:
-                     continue # Spurious wake-up: no available thread
+
+                # Ensure thread is really done by joining it
                 if self._threads[index] is not None:
                     self._threads[index].join()
 
@@ -60,6 +66,7 @@ class ThreadManager:
                 self._threads[index] = scheduled_task
                 self._threads[index]._kwargs['thread_index'] = index
                 self._threads[index].start()
+                self._dispatcher_notify_counter -= 1
 
 
     def __enter__(self):
@@ -70,7 +77,7 @@ class ThreadManager:
         # Shut down dispatcher thread
         self._dispatcher_shutdown.set()
         with self._dispatcher_notify:
-            self._dispatcher_notify.notify()
+            self._notify_dispatcher()
         self._dispatcher.join()
 
         # Join all threads
@@ -88,7 +95,7 @@ class ThreadManager:
         def wrapped_target(*args, **kwargs):
             target(*args, **kwargs)
             with self._dispatcher_notify:
-                self._dispatcher_notify.notify()
+                self._notify_dispatcher()
         return wrapped_target
 
 
