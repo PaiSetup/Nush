@@ -17,6 +17,7 @@ class DeferredLogger:
         with self._lock:
             for line in self._lines:
                 print(line)
+            self._lines.clear()
 
 
 class ThreadManager:
@@ -28,6 +29,7 @@ class ThreadManager:
         self._dispatcher = Thread(target=self._dispatcher_routine)
         self._dispatcher_shutdown = Event()
         self._dispatcher_notify = Condition()
+        self._dispatcher_tasks_started = 0
 
     def schedule_task(self, target, *args, **kwargs):
         task = Thread(target=self._wrap_target_function(target), args=args, kwargs=kwargs)
@@ -55,9 +57,14 @@ class ThreadManager:
                     if self._threads[index] is not None:
                         self._threads[index].join()
 
+                    # prepare task data
+                    task_index = self._dispatcher_tasks_started
+                    self._dispatcher_tasks_started += 1
+                    task_data = { 'thread_index': index, "task_index": task_index}
+
                     # Start thread
                     self._threads[index] = scheduled_task
-                    self._threads[index]._kwargs['thread_index'] = index
+                    self._threads[index]._kwargs['task_data'] = task_data
                     self._threads[index].start()
 
                 elif self._dispatcher_shutdown.is_set():
@@ -110,7 +117,7 @@ class FileType(Enum):
                 return enum
         return default_file_type
 
-def download_video(url, file_type, output_dir, logger, thread_index):
+def download_video(url, file_type, output_dir, logger, task_data):
     def filter_and_sort_streams(streams):
         if file_type is FileType.video:
             filter_attributes = { "progressive": True, "file_extension": "mp4"}
@@ -124,14 +131,18 @@ def download_video(url, file_type, output_dir, logger, thread_index):
         sorted_streams = filtered_streams.order_by(sort_attribute).desc()
         return sorted_streams
 
+    log_line = "Downloading url={} task_index={}, thread_index={}, type={}".format(url, task_data['task_index'], task_data['thread_index'], file_type)
     try:
-        all_streams = YouTube(url).streams
-        selected_stream = filter_and_sort_streams(all_streams).first()
-    except Exception as e:
-        logger.log("\tthread={}: Error downloading \"{}\"".format(thread_index, url))
+        video = YouTube(url)
+        title = str(task_data['task_index']) # TODO video title should be taken, but it doesn't work
+        selected_stream = filter_and_sort_streams(video.streams).first()
+        if selected_stream is None:
+            raise Exception
+    except Exception:
+        logger.log("ERROR {}".format(log_line))
     else:
-        logger.log("\tthread={}: Downloading \"{}\" - \"{}\"".format(thread_index, url, selected_stream.default_filename))
-        selected_stream.download(output_path=output_dir)
+        logger.log("      {}".format(log_line))
+        selected_stream.download(output_path=output_dir, filename=title)
 
 
 def print_help(**kwargs):
