@@ -1,12 +1,12 @@
 load_functions() {
-    pushd "$SCRIPTS_PATH/BashUtils" > /dev/null
-    counter=0
+    pushd `dirname $BASH_SOURCE` > /dev/null
+
+    . ./paths.sh $@
     while read script_file; do
         . "$script_file"
-        counter=$((counter+1))
     done <<< `find . -mindepth 2 | grep "\.sh$" | grep -v "^\./Runnable/"`
+
     popd > /dev/null
-    # echo "Loaded $counter script files"
 }
 
-load_functions
+load_functions $@

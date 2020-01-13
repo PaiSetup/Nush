@@ -1,6 +1,4 @@
 function toggle_veracrypt_mount() (
-    VERACRYPT_PATH="E:\Programs\VeraCrypt\VeraCrypt-x64.exe"
-
     # Process args
     volume_path="$1"
     drive_letter="$2"
