@@ -4,7 +4,7 @@ load_functions() {
     while read script_file; do
         . "$script_file"
         counter=$((counter+1))
-    done <<< `find . -mindepth 2 | grep "\.sh$"`
+    done <<< `find . -mindepth 2 | grep "\.sh$" | grep -v "^\./Runnable/"`
     popd > /dev/null
     # echo "Loaded $counter script files"
 }
