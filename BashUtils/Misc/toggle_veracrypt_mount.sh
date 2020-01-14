@@ -15,7 +15,7 @@ function toggle_veracrypt_mount() (
     # Toogle mount state
     if [[ $not_mounted != 0 ]] ; then
         echo "Mounting $volume_path as $drive_letter: drive..."
-        powershell -Command "$VERACRYPT_PATH /volume $volume_path /letter $drive_letter /nowaitdlg /explore /quit"
+        powershell -Command "$VERACRYPT_PATH /volume $volume_path /letter $drive_letter /explore /quit"
     else
         echo "Dismounting $drive_letter: drive..."
         powershell -Command "$VERACRYPT_PATH /dismount $drive_letter /quit"
