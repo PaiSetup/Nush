@@ -5,7 +5,12 @@ export ICON_SETTER_PATH="/d/Projects/IconSetter/build/Debug/IconSetter.exe"
 
 if [ "$1" == "debug" ]; then
     function print_path() (
-        printf '%-15s %s\n' "$1" "${!1}"
+        if [ -e "${!1}" ]; then
+            msg=
+        else
+            msg="NOT FOUND!!!"
+        fi
+        printf '%-15s %s %s\n' "$1" "${!1}" "$msg"
     )
     echo "-------------------- paths.sh"
     print_path SCRIPTS_PATH
