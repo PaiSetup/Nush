@@ -1,3 +1,3 @@
-function dwyt() (
-    python "$SCRIPTS_PATH/dwyt.py"
-)
+function dwyt() {
+    python "$SCRIPTS_PATH/../dwyt.py"
+}
