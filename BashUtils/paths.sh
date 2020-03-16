@@ -1,6 +1,6 @@
 export SCRIPTS_PATH=`realpath "$BASH_SOURCE" | xargs dirname`
-export NPP_PATH="E:\Programs\Notepad++\notepad++.exe"
-export VERACRYPT_PATH="E:\Programs\VeraCrypt\VeraCrypt-x64.exe"
+export NPP_PATH="/e/Programs/Notepad++/notepad++.exe"
+export VERACRYPT_PATH="/e/Programs/VeraCrypt/VeraCrypt-x64.exe"
 export ICON_SETTER_PATH="/d/Projects/IconSetter/build/Debug/IconSetter.exe"
 
 if [ "$1" == "debug" ]; then
