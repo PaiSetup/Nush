@@ -10,7 +10,7 @@ if [ "$1" == "debug" ]; then
         else
             msg="NOT FOUND!!!"
         fi
-        printf '%-15s %s %s\n' "$1" "${!1}" "$msg"
+        printf '%-16s %s %s\n' "$1" "${!1}" "$msg"
     )
     echo "-------------------- paths.sh"
     print_path SCRIPTS_PATH
