@@ -1,7 +1,7 @@
 load_functions() {
     pushd `dirname $BASH_SOURCE` > /dev/null
 
-    . ./paths.sh $@
+    . ./load_paths.sh $@
     while read script_file; do
         . "$script_file"
     done <<< `find . -mindepth 2 | grep "\.sh$" | grep -v "^\./Runnable/"`
