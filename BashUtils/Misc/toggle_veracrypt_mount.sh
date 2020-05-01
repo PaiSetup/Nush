@@ -1,3 +1,7 @@
+if [ -z "$VERACRYPT_PATH" ]; then
+    return
+fi
+
 function toggle_veracrypt_mount() (
     # Process args
     volume_path="$1"

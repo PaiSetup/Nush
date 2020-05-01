@@ -86,6 +86,7 @@ function load_functions() {
         loaded_path_value="${!loaded_path_name}"
         if [ ! -e "$loaded_path_value" ]; then
             echo "WARNING: \"$loaded_path_name=$loaded_path_value\" path was not found"
+            eval "export $loaded_path_name="
             validation_error=1
         fi
     done
