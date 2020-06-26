@@ -3,7 +3,7 @@ function load_functions() {
     local scripts_path=`realpath "$BASH_SOURCE" | xargs dirname`
     pushd "$scripts_path" > /dev/null
 
-    function generate_cached_paths() (
+    function generate_cached_paths_windows() {
         # Find programs directory
         for value in "/e/Programs" "/d/Programs" "/e/Programy" "/d/Programy"; do
             if [ -d "$value" ];  then
@@ -17,22 +17,7 @@ function load_functions() {
         fi
         echo "Will be looking for programs in $programs_dir"
 
-        # Functions for finding files and outputting them to paths.sh and the console properly
-        function add_entry() {
-            local variable_name="$1"
-            local variable_value="$2"
-            loaded_paths+=("$variable_name")
-            echo "export $variable_name=$variable_value"
-        }
-        function find_dir() {
-            local variable_name="$1"
-            local dir="$2"
-            if [ ! -d "$dir" ]; then
-                echo "  Did not find $dir" 2>&1
-                return
-            fi
-            add_entry "$variable_name" "$dir"
-        }
+        # Function for finding files and outputting them to paths.sh and the console properly
         function find_exe() {
             local variable_name="$1"
             local possible_directory_names="$2"
@@ -53,18 +38,43 @@ function load_functions() {
         }
 
         # Generate paths.sh file with cached paths
-        local loaded_paths=()
-        echo "# Paths loaded by load_paths.sh script, do not change it."    > paths.sh
-        find_dir  SCRIPTS_PATH    $scripts_path                            >> paths.sh
         find_exe  NPP_PATH        Notepad++      notepad++.exe             >> paths.sh
         find_exe  VERACRYPT_PATH  VeraCrypt      VeraCrypt-x64.exe         >> paths.sh
         find_exe  ICONFIGURE_PATH Iconfigure     Iconfigure.exe            >> paths.sh
-        add_entry LOADED_PATHS    "`echo "(${loaded_paths[@]})"`"          >> paths.sh
 
         # Print the file to the console
         printf "Generated paths.sh file:\n\n"
         cat paths.sh
         printf "\n"
+    }
+
+    function generate_cached_paths_linux() {
+        head -0 # bash doesn't like empty functions
+    }
+
+    function generate_cached_paths() (
+        function add_entry() {
+            local variable_name="$1"
+            local variable_value="$2"
+            loaded_paths+=("$variable_name")
+            echo "export $variable_name=$variable_value"
+        }
+
+        # Preamble
+        local loaded_paths=()
+        echo "# Paths loaded by load_paths.sh script, do not change it."    > paths.sh
+        add_entry SCRIPTS_PATH $scripts_path                               >> paths.sh
+
+        # Os-specific search
+        local isLinux=`uname -a | grep Linux | wc -l`
+        if [ $isLinux == 1 ]; then
+            generate_cached_paths_linux
+        else
+            generate_cached_paths_windows
+        fi
+
+        # Epilogue
+        add_entry LOADED_PATHS "`echo "(${loaded_paths[@]})"`"             >> paths.sh
     )
 
     # Generate paths.sh file if it's not present
