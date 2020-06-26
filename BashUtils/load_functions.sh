@@ -73,27 +73,30 @@ function load_functions() {
         generate_cached_paths 2>&1
         if [ $? != 0 ]; then
             echo "ERROR: path searching failed."
-            rm paths.sh
+            rm paths.sh 2>/dev/null
         fi
     fi
 
-    # Import all cached paths to environment variables
-    . ./paths.sh
+    # Run and validate paths.sh file if it is present
+    if [ -f paths.sh ]; then
+        # Import all cached paths to environment variables
+        . ./paths.sh
 
-    # Validate that all paths still exist
-    local validation_error=0
-    for loaded_path_name in ${LOADED_PATHS[@]}; do
-        loaded_path_value="${!loaded_path_name}"
-        if [ ! -e "$loaded_path_value" ]; then
-            echo "WARNING: \"$loaded_path_name=$loaded_path_value\" path was not found"
-            eval "export $loaded_path_name="
-            validation_error=1
+        # Validate that all paths still exist
+        local validation_error=0
+        for loaded_path_name in ${LOADED_PATHS[@]}; do
+            loaded_path_value="${!loaded_path_name}"
+            if [ ! -e "$loaded_path_value" ]; then
+                echo "WARNING: \"$loaded_path_name=$loaded_path_value\" path was not found"
+                eval "export $loaded_path_name="
+                validation_error=1
+            fi
+        done
+        if [ "$validation_error" == 1 ]; then
+            cache_file_path=`realpath "$BASH_SOURCE" | xargs dirname`.paths.sh
+            echo "Invalid path(s) came from \"$cache_file_path\" cache file."
+            echo "Deleting the file will cause regeneration at next terminal launch."
         fi
-    done
-    if [ "$validation_error" == 1 ]; then
-        cache_file_path=`realpath "$BASH_SOURCE" | xargs dirname`.paths.sh
-        echo "Invalid path(s) came from \"$cache_file_path\" cache file."
-        echo "Deleting the file will cause regeneration at next terminal launch."
     fi
 
     # Load all functions to namespace
