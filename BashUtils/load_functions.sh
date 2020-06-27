@@ -41,11 +41,6 @@ function load_functions() {
         find_exe  NPP_PATH        Notepad++      notepad++.exe
         find_exe  VERACRYPT_PATH  VeraCrypt      VeraCrypt-x64.exe
         find_exe  ICONFIGURE_PATH Iconfigure     Iconfigure.exe
-
-        # Print the file to the console
-        printf "Generated paths.sh file:\n\n"
-        cat paths.sh
-        printf "\n"
     }
 
     function generate_cached_paths_linux() {
@@ -75,6 +70,11 @@ function load_functions() {
 
         # Epilogue
         add_entry LOADED_PATHS "`echo "(${loaded_paths[@]})"`"
+
+        # Print the file to the console
+        printf "Generated paths.sh file:\n\n"
+        cat paths.sh
+        printf "\n"
     )
 
     # Generate paths.sh file if it's not present
