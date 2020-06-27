@@ -38,9 +38,9 @@ function load_functions() {
         }
 
         # Generate paths.sh file with cached paths
-        find_exe  NPP_PATH        Notepad++      notepad++.exe             >> paths.sh
-        find_exe  VERACRYPT_PATH  VeraCrypt      VeraCrypt-x64.exe         >> paths.sh
-        find_exe  ICONFIGURE_PATH Iconfigure     Iconfigure.exe            >> paths.sh
+        find_exe  NPP_PATH        Notepad++      notepad++.exe
+        find_exe  VERACRYPT_PATH  VeraCrypt      VeraCrypt-x64.exe
+        find_exe  ICONFIGURE_PATH Iconfigure     Iconfigure.exe
 
         # Print the file to the console
         printf "Generated paths.sh file:\n\n"
@@ -57,13 +57,13 @@ function load_functions() {
             local variable_name="$1"
             local variable_value="$2"
             loaded_paths+=("$variable_name")
-            echo "export $variable_name=$variable_value"
+            echo "export $variable_name=$variable_value" >> paths.sh
         }
 
         # Preamble
         local loaded_paths=()
-        echo "# Paths loaded by load_paths.sh script, do not change it."    > paths.sh
-        add_entry SCRIPTS_PATH $scripts_path                               >> paths.sh
+        echo "# Paths loaded by load_paths.sh script, do not change it." > paths.sh
+        add_entry SCRIPTS_PATH $scripts_path
 
         # Os-specific search
         local isLinux=`uname -a | grep Linux | wc -l`
@@ -74,7 +74,7 @@ function load_functions() {
         fi
 
         # Epilogue
-        add_entry LOADED_PATHS "`echo "(${loaded_paths[@]})"`"             >> paths.sh
+        add_entry LOADED_PATHS "`echo "(${loaded_paths[@]})"`"
     )
 
     # Generate paths.sh file if it's not present
