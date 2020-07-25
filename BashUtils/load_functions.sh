@@ -17,7 +17,7 @@ function load_functions() {
         fi
         echo "Will be looking for programs in $programs_dir"
 
-        # Function for finding files and outputting them to paths.sh and the console properly
+        # Helper function for finding executables and putting them into paths.sh
         function find_exe() {
             local variable_name="$1"
             local possible_directory_names="$2"
@@ -37,14 +37,27 @@ function load_functions() {
             echo "  Did not find $exe_name" >&2
         }
 
-        # Generate paths.sh file with cached paths
+        # Executables list
         find_exe  NPP_PATH        Notepad++      notepad++.exe
         find_exe  VERACRYPT_PATH  VeraCrypt      VeraCrypt-x64.exe
         find_exe  ICONFIGURE_PATH Iconfigure     Iconfigure.exe
     }
 
     function generate_cached_paths_linux() {
-        head -0 # bash doesn't like empty functions
+        # Helper function for finding binaries and putting them into paths.sh
+        function find_binary() {
+            local variable_name="$1"
+            local binary_name="$2"
+            local found_path=`which $binary_name`
+            if [ $? == 0 ]; then
+                add_entry "$variable_name" "$found_path"
+            else
+                echo "  Did not find $binary_name" >&2
+            fi
+        }
+
+        # Binaries list
+        find_binary XRANDR_PATH xrandr
     }
 
     function generate_cached_paths() (
@@ -57,7 +70,7 @@ function load_functions() {
 
         # Preamble
         local loaded_paths=()
-        echo "# Paths loaded by load_paths.sh script, do not change it." > paths.sh
+        echo "# Paths loaded by load_functions.sh script, do not change it." > paths.sh
         add_entry SCRIPTS_PATH $scripts_path
 
         # Os-specific search
