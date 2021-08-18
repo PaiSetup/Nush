@@ -1,3 +1,5 @@
-function b() {
-    ./build.sh
-}
+function b() (
+    mkdir -p build
+    cd build
+    cmake ..
+)
