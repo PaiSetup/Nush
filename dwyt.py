@@ -186,7 +186,7 @@ def parse_lines(lines, default_file_type):
         yield url, file_type
 
 def main():
-    thread_count = 3
+    thread_count = 8
     output_dir = "yt"
     default_file_type = FileType.video
 
