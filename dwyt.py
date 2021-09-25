@@ -127,7 +127,7 @@ def download_video(url, file_type, output_dir, logger, task_data):
     else:
         raise Exception("Invalid type")
 
-    log_line = "Downloading url={} task_index={}, thread_index={}, type={}".format(url, task_data['task_index'], task_data['thread_index'], file_type)
+    log_line = f"Downloading url={url}   task_index={task_data['task_index']}   thread_index={task_data['thread_index']}   type={file_type}"
     try:
         video = YouTube(url)
         streams = video.streams
@@ -137,10 +137,11 @@ def download_video(url, file_type, output_dir, logger, task_data):
         if selected_stream is None:
             raise Exception
     except Exception:
-        logger.log("ERROR {}".format(log_line))
+        logger.log(f"ERROR {log_line}")
     else:
-        logger.log("      {}".format(log_line))
-        selected_stream.download(output_path=output_dir, filename=selected_stream.default_filename)
+        out_file = selected_stream.default_filename
+        logger.log(f"      {log_line}   out_file=\"{out_file}\"")
+        selected_stream.download(output_path=output_dir, filename=out_file)
 
 
 def print_help(**kwargs):
