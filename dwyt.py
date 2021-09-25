@@ -118,31 +118,29 @@ class FileType(Enum):
         return default_file_type
 
 def download_video(url, file_type, output_dir, logger, task_data):
-    def filter_and_sort_streams(streams):
-        if file_type is FileType.video:
-            filter_attributes = { "progressive": True, "file_extension": "mp4"}
-            sort_attribute = "resolution"
-        elif file_type is FileType.audio:
-            filter_attributes = { "only_audio": True, "file_extension": "mp4"}
-            sort_attribute = "abr"
-        else:
-            raise Exception("Invalid type")
-        filtered_streams = streams.filter(**filter_attributes)
-        sorted_streams = filtered_streams.order_by(sort_attribute).desc()
-        return sorted_streams
+    if file_type is FileType.video:
+        filter_attributes = {"progressive": True, "file_extension": "mp4"}
+        sort_attribute = "resolution"
+    elif file_type is FileType.audio:
+        filter_attributes = {"only_audio": True, "file_extension": "mp4"}
+        sort_attribute = "abr"
+    else:
+        raise Exception("Invalid type")
 
     log_line = "Downloading url={} task_index={}, thread_index={}, type={}".format(url, task_data['task_index'], task_data['thread_index'], file_type)
     try:
         video = YouTube(url)
-        title = str(task_data['task_index']) # TODO video title should be taken, but it doesn't work
-        selected_stream = filter_and_sort_streams(video.streams).first()
+        streams = video.streams
+        streams = streams.filter(**filter_attributes)
+        streams = streams.order_by(sort_attribute).desc()
+        selected_stream = streams.first()
         if selected_stream is None:
             raise Exception
     except Exception:
         logger.log("ERROR {}".format(log_line))
     else:
         logger.log("      {}".format(log_line))
-        selected_stream.download(output_path=output_dir, filename=title)
+        selected_stream.download(output_path=output_dir, filename=selected_stream.default_filename)
 
 
 def print_help(**kwargs):
