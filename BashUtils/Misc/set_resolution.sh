@@ -41,8 +41,11 @@ function set_resolution() (
     for index in ${!displays[*]}; do
         echo "  $index: ${displays[$index]}"
     done
-    echo -n "Select display by typing its index: "
+    echo -n "Select display by typing its index (default: 0): "
     read selected_display
+    if [ -z "$selected_display"]; then
+        selected_display=0
+    fi
 
     # Validate selection
     valid_display_selection=`validate_index_selection "$selected_display" "$displays_count"`
@@ -84,14 +87,9 @@ function set_resolution() (
     resolution=`echo $resolution | cut -d' ' -f1`
     echo
 
-    # Prompt if user is sure
-    while :; do
-        echo -n "Do you want to set resolution $resolution to $display? (y/n)"
-        read answer
-        if   [ "$answer" == 'y' ]; then break
-        elif [ "$answer" == 'n' ]; then return 0
-        fi
-    done
-    xrandr --output $display --mode $resolution
+    # Perform operation
+    command="xrandr --output $display --mode $resolution"
+    echo "$command"
+    eval $command
 )
 
