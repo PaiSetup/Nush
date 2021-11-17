@@ -2,7 +2,7 @@
 
 load_functions() {
     for file in $(find "$SCRIPTS_PATH" -mindepth 2 -name "*.sh"); do
-        source "$file"
+        . "$file"
     done
 }
 
@@ -11,6 +11,6 @@ if [ -z "$1" ] || [ ! -d "$1" ]; then
     return
 fi
 
-SCRIPTS_PATH="$1"
-IS_LINUX=$(uname -a | grep -cv "Linux")
+export SCRIPTS_PATH="$1"
+export IS_LINUX=$(uname -a | grep -cv "Linux")
 load_functions
