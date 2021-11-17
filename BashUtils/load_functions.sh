@@ -6,11 +6,10 @@ load_functions() {
     done
 }
 
-if [ -z "$1" ] || [ ! -d "$1" ]; then
-    echo "ERROR: load_functions() requires a valid path to scripts directory." >&2
+if [ -z "$SCRIPTS_PATH" ] || [ ! -d "$SCRIPTS_PATH" ]; then
+    echo "ERROR: load_functions() requires SCRIPTS_PATH variable to be set to a valid directory." >&2
     return
 fi
 
-export SCRIPTS_PATH="$1"
 export IS_LINUX=$(uname -a | grep -cv "Linux")
 load_functions
