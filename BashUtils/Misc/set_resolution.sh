@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ -z "$XRANDR_PATH" ]; then
+if [ $IS_LINUX != 0 ] ; then
     return
 fi
 
