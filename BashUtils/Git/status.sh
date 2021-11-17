@@ -1,3 +1,5 @@
-function status() (
+#!/bin/sh
+
+status() (
     git status
 )

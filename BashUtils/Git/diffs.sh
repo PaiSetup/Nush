@@ -1,3 +1,5 @@
-function diffs() (
-    git diff --stat $@
+#!/bin/sh
+
+diffs() (
+    git diff --stat "$@"
 )

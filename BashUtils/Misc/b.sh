@@ -1,5 +1,7 @@
-function b() (
+#!/bin/sh
+
+b() (
     mkdir -p build
-    cd build
-    cmake .. $@
+    cd build || return
+    cmake .. "$@"
 )

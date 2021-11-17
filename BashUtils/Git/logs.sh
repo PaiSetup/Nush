@@ -1,3 +1,5 @@
-function logs() (
+#!/bin/sh
+
+logs() (
     log -10
 )

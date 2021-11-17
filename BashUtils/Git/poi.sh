@@ -1,5 +1,6 @@
-# print ordinary info
-function poi() (
+#!/bin/sh
+
+poi() (
     echo "> logs"
     logs
     
