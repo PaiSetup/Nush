@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [ -z "$VERACRYPT_PATH" ]; then
     return
@@ -14,9 +14,10 @@ toggle_veracrypt_mount() (
     fi
 
     # Check if drive is mounted
+    # shellcheck disable=2164
     pushd /$drive_letter/ >/dev/null 2>&1
     not_mounted=$?
-    popd >/dev/null 2>&1
+    popd >/dev/null 2>&1 || exit
 
     # Toogle mount state
     VERACRYPT_PATH=$(convert_to_windows_path "$VERACRYPT_PATH")
