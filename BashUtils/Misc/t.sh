@@ -2,5 +2,9 @@
 
 t() (
     cd build || return
-    cmake --build . --config Debug && ctest -C Debug --verbose
+    if [ "$IS_LINUX" = 0 ]; then
+        extraArgs="-- -j$(nproc)"
+    fi
+
+    cmake --build . --config Debug $extraArgs && ctest -C Debug --verbose
 )
