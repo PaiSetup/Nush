@@ -1,9 +1,5 @@
 #!/bin/sh
 
-if [ $IS_LINUX != 0 ] ; then
-    return
-fi
-
 get_array_count() {
     echo "$#"
 }
