@@ -5,7 +5,7 @@ get_unmatching_packages() {
     file_actual="$(mktemp --suffix=".actual")"
 
     printf "Gathering expected packages in $file_expected... "
-    $LINUX_SETUP_ROOT/setup.py --list_packages | sort | tee "$file_expected" | wc -l
+    $LINUX_SETUP_ROOT/setup.py --list_packages | sort | uniq | tee "$file_expected" | wc -l
 
     printf "Gathering actual packages in $file_actual... "
     yay -Qeq | sort | tee "$file_actual" | wc -l

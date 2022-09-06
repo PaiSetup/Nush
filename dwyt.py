@@ -4,6 +4,7 @@ from enum import Enum
 
 from pytube import YouTube
 
+
 class DeferredLogger:
     def __init__(self):
         self._lock = Lock()
@@ -60,11 +61,11 @@ class ThreadManager:
                     # prepare task data
                     task_index = self._dispatcher_tasks_started
                     self._dispatcher_tasks_started += 1
-                    task_data = { 'thread_index': index, "task_index": task_index}
+                    task_data = {"thread_index": index, "task_index": task_index}
 
                     # Start thread
                     self._threads[index] = scheduled_task
-                    self._threads[index]._kwargs['task_data'] = task_data
+                    self._threads[index]._kwargs["task_data"] = task_data
                     self._threads[index].start()
 
                 elif self._dispatcher_shutdown.is_set():
@@ -97,6 +98,7 @@ class ThreadManager:
             target(*args, **kwargs)
             with self._dispatcher_notify:
                 self._dispatcher_notify.notify()
+
         return wrapped_target
 
 
@@ -105,6 +107,7 @@ def ensure_output_dir_is_present(output_dir):
         mkdir(output_dir)
     except OSError:
         pass  # directory already exists
+
 
 class FileType(Enum):
     video = "video"
@@ -116,6 +119,7 @@ class FileType(Enum):
             if enum.value == string:
                 return enum
         return default_file_type
+
 
 def download_video(url, file_type, output_dir, logger, task_data):
     if file_type is FileType.video:
@@ -140,7 +144,7 @@ def download_video(url, file_type, output_dir, logger, task_data):
         logger.log(f"ERROR {log_line}")
     else:
         out_file = selected_stream.default_filename
-        logger.log(f"      {log_line}   out_file=\"{out_file}\"")
+        logger.log(f'      {log_line}   out_file="{out_file}"')
         selected_stream.download(output_path=output_dir, filename=out_file)
 
 
@@ -148,7 +152,7 @@ def print_help(**kwargs):
     print("DWYT - download youtube")
     print("Parameters:")
     for parameter_name, parameter_value in kwargs.items():
-        print("\t{} = {}".format(parameter_name,parameter_value))
+        print("\t{} = {}".format(parameter_name, parameter_value))
     print("Valid inputs:")
     print("\tUrl (starting with https)")
     print("\tFile name - file with urls in each line")
@@ -161,7 +165,7 @@ def print_help(**kwargs):
 
 def query_lines():
     while True:
-        print('\t', end='')
+        print("\t", end="")
         line = input()
         if line == "":
             return
@@ -175,15 +179,17 @@ def query_lines():
                 for line in file.read().splitlines():
                     yield line
 
+
 def parse_lines(lines, default_file_type):
     for line in lines:
-        if line.startswith('#'):
+        if line.startswith("#"):
             continue
 
         tokens = line.split()
         url = tokens[0]
         file_type = FileType.from_string(tokens[1], default_file_type) if len(tokens) > 1 else default_file_type
         yield url, file_type
+
 
 def main():
     thread_count = 8
@@ -199,5 +205,6 @@ def main():
     print("Done")
     logger.output_logs()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
