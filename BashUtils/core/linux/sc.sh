@@ -14,5 +14,5 @@ scc() (
         find ~/.profile ~/.bashrc ~/.bash_profile ~/.xinitrc 2>/dev/null
     }
 
-    (seek_for_regular_scripts ; seek_for_dotfiles_scripts) |  xargs -l1 shellcheck -e 2086,2181,2038,2009,2068,2046,2155,2044,1090,1091,2059,2015
+    (seek_for_regular_scripts ; seek_for_dotfiles_scripts) |  xargs -l1 shellcheck -e 2086,2181,2038,2009,2068,2046,2155,2044,1090,1091,2059,2015,2207
 )
