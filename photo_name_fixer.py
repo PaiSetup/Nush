@@ -15,39 +15,44 @@ match_hour = "[0-1][0-9]|2[0-4]"
 match_minute = "[0-5][0-9]"
 match_second = match_minute
 
+
 class NameFixer:
+    def __init__(self):
+        self._prefixes = "IMG-|IMG_|VID_|VideoCapture_"
+        self._suffixes = "_HDR|-WA[0-9]+|_TIMEBURST[0-9]+|_[0-9]+|~[0-9]+| ?\([0-9]+\)"
+
     def fix(self, name):
         path = Path(name)
 
         disassembly_comment, tokens = self.disassemble(path)
         if tokens is None:
-            return None
+            return (None, None)
         else:
             return (disassembly_comment, self.assemble(path.parent, tokens, path.suffix))
 
     def assemble(self, dir, tokens, extension):
         (year, month, day, hour, minute, second) = tokens
-        return Path(dir, f"{year}{month}{day}_{hour}{minute}{second}{extension}")
+        return Path(dir, f"{year:04}{month:02}{day:02}_{hour:02}{minute:02}{second:02}{extension}")
 
     def disassemble(self, path):
         disassemble_functions = [
-            self.disassemble_function1,
-            self.disassemble_function2,
+            self.disassemble_yymmdd_hhmmss,
+            self.disassemble_yymmdd_wa,
+            self.disassemble_yymmdd,
+            self.disassembly_from_metadata,
         ]
         for fn in disassemble_functions:
             result = fn(path)
             if result is not None:
                 return (fn.__name__, result)
+        return (None, None)
 
-    def disassemble_function1(self, path):
+    def disassemble_yymmdd_hhmmss(self, path):
         """
         Takes names in format YYYYMMDD_HHMMSS, such as "20220714_103015". Date and hour tokens can be extracted directly from name
         """
-
-        prefixes = "IMG-|IMG_|VID_|VideoCapture_"
-        suffixes = "_HDR|_TIMEBURST[0-9]+|_[0-9]+|~[0-9]+| ?\([0-9]+\)"
         result = re.search(
-            f"^({prefixes})?({match_year})({match_month})({match_day})(_|-)({match_hour})({match_minute})({match_second})($|{suffixes})",
+            f"^({self._prefixes})?({match_year})({match_month})({match_day})(_|-)({match_hour})({match_minute})({match_second})($|{self._suffixes})",
             path.stem,
         )
         if result is None:
@@ -56,7 +61,43 @@ class NameFixer:
         result = result[1:4] + result[5:8]
         return result
 
-    def disassemble_function2(self, path):
+    def disassemble_yymmdd_wa(self, path):
+        """
+        Takes names in format YYYYMMDD with WA suffix, such as "20220714-WA0001". Date tokens can be extracted directly from name. Hour tokens cannot be
+        extracted and they are assigned made up values based on index after 'WA'.
+        """
+        result = re.search(
+            f"^({self._prefixes})?({match_year})({match_month})({match_day})-WA([0-9]+)",
+            path.stem,
+        )
+        if result is None:
+            return None
+        result = result.groups()
+
+        time = (
+            int(result[4]) // 3600,
+            int(result[4]) // 60 % 60,
+            int(result[4]) % 60,
+        )
+        result = result[1:4] + time
+        return result
+
+    def disassemble_yymmdd(self, path):
+        """
+        Takes names in format YYYYMMDD, such as "20220714". Date tokens can be extracted directly from name. Hour tokens cannot be
+        extracted and they are assigned as 0.
+        """
+        result = re.search(
+            f"^({self._prefixes})?({match_year})({match_month})({match_day})($|{self._suffixes})",
+            path.stem,
+        )
+        if result is None:
+            return None
+        result = result.groups()
+        result = result[1:4] + (0, 0, 0)
+        return result
+
+    def disassembly_from_metadata(self, path):
         """
         This function processes files from which we cannot extract all date/time tokens just by filename. They can be instead extracted
         from file metadata. This is not very reliable though - metadata can be broken by various programs and editing.
@@ -69,8 +110,8 @@ class NameFixer:
             f"(IMG|VID)-{match_year}{match_month}{match_day}-WA[0-9]+",
             "IMG_[0-9]+",
         ]
-        patterns = [f'(^{x}$)' for x in patterns]
-        pattern = '|'.join(patterns)
+        patterns = [f"(^{x}$)" for x in patterns]
+        pattern = "|".join(patterns)
         result = re.match(
             pattern,
             path.stem,
@@ -156,6 +197,9 @@ class RenameMap:
         result += "}"
         return result
 
+    def __iter__(self):
+        return iter(self._map.items())
+
 
 def get_files(directories):
     result = []
@@ -163,7 +207,6 @@ def get_files(directories):
         for folder, _, files in os.walk(directory):
             result += [os.path.join(folder, f) for f in files]
     return result
-
 
 
 def copy_files(rename_map, dst_dir):
@@ -174,13 +217,15 @@ def copy_files(rename_map, dst_dir):
 
     print("Performing a copy operation")
     dst_dir.mkdir(parents=True)
-    for src, dst in rename_map.items():
+    for src, dst in rename_map:
         shutil.copyfile(src, dst)
+
 
 def rename_files(rename_map):
     print("Performing an in-place rename operation")
-    for src, dst in rename_map.items():
+    for src, dst in rename_map:
         shutil.move(src, dst)
+
 
 if __name__ == "__main__":
     # fmt: off
