@@ -17,9 +17,17 @@ match_second = match_minute
 
 
 class NameFixer:
-    def __init__(self):
+    def __init__(self, allow_metadata):
         self._prefixes = "IMG-|IMG_|VID_|VideoCapture_"
         self._suffixes = "_HDR|-WA[0-9]+|_TIMEBURST[0-9]+|_[0-9]+|~[0-9]+| ?\([0-9]+\)"
+        self.disassemble_functions = [
+            self.disassemble_yymmdd_hhmmss,
+            self.disassemble_yymmdd_wa,
+            self.disassemble_yymmdd,
+        ]
+        if allow_metadata:
+            self.disassemble_functions.append(self.disassembly_from_metadata)
+
 
     def fix(self, name):
         path = Path(name)
@@ -35,13 +43,7 @@ class NameFixer:
         return Path(dir, f"{year:04}{month:02}{day:02}_{hour:02}{minute:02}{second:02}{extension}")
 
     def disassemble(self, path):
-        disassemble_functions = [
-            self.disassemble_yymmdd_hhmmss,
-            self.disassemble_yymmdd_wa,
-            self.disassemble_yymmdd,
-            self.disassembly_from_metadata,
-        ]
-        for fn in disassemble_functions:
+        for fn in self.disassemble_functions:
             result = fn(path)
             if result is not None:
                 return (fn.__name__, result)
@@ -142,7 +144,7 @@ class RenameMap:
         self._disassembly_info[src] = disassembly_comment
 
     def has_none(self):
-        return None in self._map
+        return None in self._map.values()
 
     def point_to_directory(self, root_src_dirs, root_dst_dir):
         new_map = {}
@@ -187,7 +189,7 @@ class RenameMap:
 
     def to_string(self, only_nones):
         result = ""
-        result += "{"
+        result += "{\n"
         max_src_length = max((len(x) for x in self._map.keys()))
         max_dst_length = max((len(str(x)) for x in self._map.values()))
         for src, dst in self._map.items():
@@ -235,6 +237,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("-d", "--directories", nargs='+', type=Path, required=True, help="Directories with photos")
     arg_parser.add_argument("-c", "--copyto", type=Path, help="Perform a copy operation to specified path")
     arg_parser.add_argument("-i", "--renameinplace", action="store_true", help="Perform a rename operation on input files")
+    arg_parser.add_argument("-m", "--allowmetadata", action="store_true", help="Allow looking at file metadata to find out the date. Not recommended.")
     args = arg_parser.parse_args()
     # fmt: on
 
@@ -245,7 +248,7 @@ if __name__ == "__main__":
             sys.exit(1)
 
     # Get files and prepare a rename map - a dictionary in which key is old filename and value is new filename
-    name_fixer = NameFixer()
+    name_fixer = NameFixer(args.allowmetadata)
     rename_map = RenameMap()
     files = get_files(args.directories)
     for file in files:
