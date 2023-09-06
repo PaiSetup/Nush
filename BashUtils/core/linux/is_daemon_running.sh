@@ -9,7 +9,6 @@ is_daemon_running() (
     while read -r daemon; do
         daemon_name="${daemon##* }"
         daemon_regex="${daemon% *}"
-        # count=$(pgrep -f "$daemon" | wc -l)
         count=$(ps -x -o pid= -o cmd= | grep -Ec "^\s*[0-9]+ $daemon_regex")
         if [ "$count" = 0 ]; then echo "$daemon_name is not running"; fi
         if [ "$count" -gt 1 ]; then echo "$count instances of $daemon_name are running"; fi
