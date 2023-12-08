@@ -22,4 +22,8 @@ amend() (
     git commit -a --amend
 )
 
+diffc() (
+    git diff --cached "$@"
+)
+
 alias status="git status"
