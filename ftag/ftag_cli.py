@@ -108,7 +108,7 @@ def create_engine():
 # Execute main command
 if args.file is not None:
     if not args.file.is_file():
-        error(f"invalid file {file}")
+        error(f"invalid file {args.file}")
     engine = create_engine()
     print_current_tags(engine, args.file)
     tag_file(engine, args.file)
@@ -118,5 +118,3 @@ else:
     parser.print_help()
     print()
     error("no action")
-
-# st -e sh -c "/home/maciej/work/ftag/ftag_cli.py --file %F"
