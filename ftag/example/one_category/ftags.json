@@ -1,0 +1,37 @@
+{
+    "files": {
+        "786a02f742015903c6c6fd852552d272912f4740e1584761": {
+            "path": "blue.txt",
+            "tags": {
+                "color": [
+                    "blue"
+                ]
+            }
+        },
+        "37dd9d555eea526af74c1b1eb02e286717f687645cc97d10": {
+            "path": "blue.txt",
+            "tags": {
+                "color": [
+                    "blue"
+                ]
+            }
+        },
+        "3fa6a605c63f3e3b4beb39fc42db7737169f4a77e4cc3084": {
+            "path": "yellow.txt",
+            "tags": {
+                "color": [
+                    "green",
+                    "red"
+                ]
+            }
+        }
+    },
+    "tags": {
+        "color": [
+            "blue",
+            "red",
+            "green",
+            "other"
+        ]
+    }
+}
