@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from tag_engine import TagEngine
+from tag_engine import TagEngine, TagEngineState
 from utils import error, info, read_indices_or_character, read_tag, read_yes_no, warning
 
 # Parse arguments
@@ -93,14 +93,13 @@ def tag_file(engine, file_to_tag):
     engine.save()
     engine.generate()
 
-
 def generate():
     engine.generate()
 
 
 def create_engine():
     engine = TagEngine()
-    if not engine.is_loaded():
+    if engine.get_state() != TagEngineState.Loaded:
         error("Failed to load ftags metadata")
     return engine
 

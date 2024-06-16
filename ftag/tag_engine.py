@@ -2,36 +2,40 @@ import hashlib
 import json
 import os
 import shutil
+import enum
 from pathlib import Path
 
 tagged_directory_name = "ftags"
 metadata_file_name = "ftags.json"
 metadata_file_name_tmp = "ftags_tmp.json"
 
+class TagEngineState(enum.Enum):
+    NotLoaded = enum.auto()
+    InvalidData = enum.auto()
+    Loaded = enum.auto()
 
 class TagEngine:
     def __init__(self):
-        self._is_loaded = False
-        self._metadata_file = None
-        self._root_dir_path = None
-        self._symlink_root = None
+        self._state = TagEngineState.NotLoaded
+        self._root_dir = None
         self._metadata = None
 
-        self._metadata_file = TagEngine._find_metadata_file()
-        if self._metadata_file is not None:
-            self._root_dir_path = self._metadata_file.parent
-            self._symlink_root = self._root_dir_path / tagged_directory_name
-            self._metadata = TagEngine._read_metadata(self._metadata_file)
-        if self._metadata is not None:
-            self._is_loaded = True
+        self._root_dir = TagEngine._find_root_dir()
+        if self._root_dir is not None:
+            self._metadata = TagEngine._read_metadata(self._get_metadata_file_path())
+
+            if self._metadata is None:
+                self._state = TagEngineState.InvalidData
+            else:
+                self._state = TagEngineState.Loaded
 
     @staticmethod
-    def _find_metadata_file():
+    def _find_root_dir():
         current_path = Path(os.path.abspath(os.curdir))
         while current_path != Path(current_path.root):
             ftags_path = current_path / metadata_file_name
             if ftags_path.is_file():
-                return ftags_path
+                return current_path
             current_path = current_path.parent
         return None
 
@@ -48,22 +52,34 @@ class TagEngine:
 
         return metadata
 
-    def is_loaded(self):
-        return self._is_loaded
+    def _get_metadata_file_path(self):
+        return self._root_dir / metadata_file_name
+
+    def _get_root_dir_path(self):
+        return self._root_dir
+
+    def _get_symlink_root(self):
+        return self._root_dir / tagged_directory_name
+
+    def get_state(self):
+        return self._state
+
+    def get_metadata_file(self):
+        return self._metadata_file
 
     def save(self):
-        real_file = self._metadata_file
-        tmp_file = self._root_dir_path / metadata_file_name_tmp
+        real_file = self._get_metadata_file_path()
+        tmp_file = self._get_root_dir_path() / metadata_file_name_tmp
 
         with open(tmp_file, "w") as file:
             content = json.dump(self._metadata, file, indent=4)
         shutil.move(tmp_file, real_file)
 
     def _get_taggable_files(self):
-        for root, dirs, files in os.walk(self._root_dir_path):
+        for root, dirs, files in os.walk(self._get_root_dir_path()):
             for file_name in files:
                 file_path = Path(os.path.abspath(os.path.join(root, file_name)))
-                if file_path.is_relative_to(self._symlink_root):
+                if file_path.is_relative_to(self._get_symlink_root()):
                     continue
                 if file_name == metadata_file_name:
                     continue
@@ -95,7 +111,7 @@ class TagEngine:
             # print(f"Symlinking {file_path} {file_hash}")
             for category, values in file_tags.items():
                 for value in values:
-                    symlink_dir = f"{self._symlink_root}/{category}/{value}"
+                    symlink_dir = f"{self._get_symlink_root()}/{category}/{value}"
                     symlink(file_path, symlink_dir)
 
     def dump_raw_metadata_to_console(self):
