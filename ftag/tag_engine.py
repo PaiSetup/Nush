@@ -16,26 +16,39 @@ class TagEngineState(enum.Enum):
 
 class TagEngine:
     def __init__(self):
-        self._state = TagEngineState.NotLoaded
         self._root_dir = None
         self._metadata = None
 
         self._root_dir = TagEngine._find_root_dir()
         if self._root_dir is not None:
-            self._metadata = TagEngine._read_metadata(self._get_metadata_file_path())
+            self._metadata = TagEngine._read_metadata(self.get_metadata_file())
 
             if self._metadata is None:
                 self._state = TagEngineState.InvalidData
             else:
                 self._state = TagEngineState.Loaded
+        else:
+            self._state = TagEngineState.NotLoaded
+
+    def initialize(self):
+        self._root_dir = Path(os.path.abspath(os.curdir))
+        self._metadata = {
+            "files": {},
+            "tags": {},
+        }
+        self.save()
+        self._state = TagEngineState.Loaded
 
     @staticmethod
     def _find_root_dir():
+        previous_path = None
         current_path = Path(os.path.abspath(os.curdir))
-        while current_path != Path(current_path.root):
+        while current_path != previous_path:
             ftags_path = current_path / metadata_file_name
             if ftags_path.is_file():
                 return current_path
+
+            previous_path = current_path
             current_path = current_path.parent
         return None
 
@@ -52,9 +65,6 @@ class TagEngine:
 
         return metadata
 
-    def _get_metadata_file_path(self):
-        return self._root_dir / metadata_file_name
-
     def _get_root_dir_path(self):
         return self._root_dir
 
@@ -65,13 +75,14 @@ class TagEngine:
         return self._state
 
     def get_metadata_file(self):
-        return self._metadata_file
+        return self._root_dir / metadata_file_name
 
     def save(self):
-        real_file = self._get_metadata_file_path()
+        real_file = self.get_metadata_file()
         tmp_file = self._get_root_dir_path() / metadata_file_name_tmp
 
         with open(tmp_file, "w") as file:
+            self._root_dir / metadata_file_name
             content = json.dump(self._metadata, file, indent=4)
         shutil.move(tmp_file, real_file)
 

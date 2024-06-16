@@ -9,6 +9,7 @@ from utils import error, info, read_indices_or_character, read_tag, read_yes_no,
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Tag files and generate symlink structures.")
+parser.add_argument("-c", "--create", action="store_true", help="Create new ftag database.")
 parser.add_argument("-f", "--file", type=Path, help="Path to the file to tag interactively")
 parser.add_argument("-g", "--generate", action="store_true", help="Generate symlinks")
 args = parser.parse_args()
@@ -26,6 +27,27 @@ def print_current_tags(engine, file_to_tag):
         else:
             print(f"  {category}: NONE")
     print()
+
+
+def load_engine():
+    engine = TagEngine()
+    if engine.get_state() != TagEngineState.Loaded:
+        error("Failed to load ftags metadata")
+    return engine
+
+
+def initialize_database():
+    engine = TagEngine()
+    if engine.get_state() != TagEngineState.NotLoaded:
+        error(f"Ftag database is already created: {self.get_metadata_file()}")
+    engine.initialize()
+
+    engine = TagEngine()
+    if engine.get_state() != TagEngineState.Loaded:
+        error("Failed to create new ftag database")
+    else:
+        info(f"Successfully created new ftag database in {engine.get_metadata_file()}")
+
 
 
 def tag_file(engine, file_to_tag):
@@ -93,26 +115,26 @@ def tag_file(engine, file_to_tag):
     engine.save()
     engine.generate()
 
+
 def generate():
     engine.generate()
 
 
-def create_engine():
-    engine = TagEngine()
-    if engine.get_state() != TagEngineState.Loaded:
-        error("Failed to load ftags metadata")
-    return engine
+
 
 
 # Execute main command
 if args.file is not None:
     if not args.file.is_file():
         error(f"invalid file {args.file}")
-    engine = create_engine()
+    engine = load_engine()
     print_current_tags(engine, args.file)
     tag_file(engine, args.file)
 elif args.generate:
-    create_engine().generate()
+    engine = load_engine()
+    engine.generate()
+elif args.create:
+    initialize_database()
 else:
     parser.print_help()
     print()
