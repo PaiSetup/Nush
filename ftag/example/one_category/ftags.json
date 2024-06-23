@@ -12,7 +12,11 @@
             "path": "blue.txt",
             "tags": {
                 "color": [
-                    "blue"
+                    "blue",
+                    "fixed"
+                ],
+                "smell": [
+                    "lel"
                 ]
             }
         },
@@ -24,6 +28,20 @@
                     "red"
                 ]
             }
+        },
+        "ccd823caf8108f62c012b02d4c233da76eacf9fdea959b9d": {
+            "path": "green.txt",
+            "tags": {
+                "color": [
+                    "blue",
+                    "red",
+                    "green",
+                    "other"
+                ],
+                "smell": [
+                    "lel"
+                ]
+            }
         }
     },
     "tags": {
@@ -31,7 +49,13 @@
             "blue",
             "red",
             "green",
-            "other"
+            "other",
+            "fucked",
+            "fair",
+            "fixed"
+        ],
+        "smell": [
+            "lel"
         ]
     }
 }

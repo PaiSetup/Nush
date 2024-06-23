@@ -108,18 +108,18 @@ class TagEngine:
                 yield file_path
 
     def generate(self):
-        def symlink(real_file_path, symlink_dir):
+        def symlink(real_file_path, symlink_dir, index, decimal_places):
             real_file_path = Path(real_file_path).absolute()
             symlink_dir = Path(symlink_dir).absolute()
 
             symlink_dir.mkdir(parents=True, exist_ok=True)
-            symlink_path = symlink_dir / real_file_path.name
+            symlink_name = f"{str(index).zfill(decimal_places)}{real_file_path.suffix}"
+            symlink_path = symlink_dir / symlink_name
             if symlink_path.exists():
                 symlink_path.unlink()
             os.symlink(real_file_path, symlink_path)
 
-        a = list(self._get_taggable_files())
-
+        symlink_indices = dict()
         for file_path in self._get_taggable_files():
             file_hash = TagEngine._get_file_hash(file_path)
             if file_hash is None:
@@ -133,8 +133,16 @@ class TagEngine:
             # print(f"Symlinking {file_path} {file_hash}")
             for category, values in file_tags.items():
                 for value in values:
+                    # Retrieve cached index
+                    symlink_indices_key = (category, value)
+                    try:
+                        index = symlink_indices[symlink_indices_key] + 1
+                    except KeyError:
+                        index = 0
+                    symlink_indices[symlink_indices_key] = index
+
                     symlink_dir = f"{self._get_symlink_root()}/{category}/{value}"
-                    symlink(file_path, symlink_dir)
+                    symlink(file_path, symlink_dir, index, 4)  # TODO calculate decimal places
 
     def dump_raw_metadata_to_console(self):
         print(json.dumps(self._metadata, indent=4))
