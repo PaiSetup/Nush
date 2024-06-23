@@ -41,6 +41,14 @@ def join_human_readable_strings(list_arg):
         return result
 
 
+def join_selected_tags_names(tags, available_tags):
+    indices = [str(available_tags.index(x)) for x in tags]
+
+    indices_str = " ".join(indices)
+    tags_str = ", ".join(tags)
+    return f"{tags_str} ( {indices_str} )"
+
+
 def read_indices(available_tags, previous_tag_indices, max_index):
     def parse_tag_index(input_tag):
         # Try to read as an integer

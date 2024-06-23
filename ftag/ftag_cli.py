@@ -5,7 +5,15 @@ import sys
 from pathlib import Path
 
 from tag_engine import TagEngine, TagEngineException, TagEngineState
-from utils import error, info, read_indices, read_tag, read_yes_no, warning
+from utils import (
+    error,
+    info,
+    join_selected_tags_names,
+    read_indices,
+    read_tag,
+    read_yes_no,
+    warning,
+)
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Tag files and generate symlink structures.")
@@ -79,8 +87,7 @@ def tag_file(engine, file_to_tag):
             current_values_indices = None
         else:
             current_values_indices = [available_values.index(x) for x in current_values]
-            current_values_indices_str = [str(x) for x in current_values_indices]
-            print(f"Current value: {', '.join(current_values)} ( {' '.join(current_values_indices_str)} )")
+            print(f"Current tags: {join_selected_tags_names(current_values, available_values)}")
 
         # Read user selection
         while True:
@@ -103,6 +110,7 @@ def tag_file(engine, file_to_tag):
             values = [available_values[index] for index in indices]
 
             tags[category] = values
+            print(f"Selected tags: {join_selected_tags_names(values, available_values)}")
             print()
             break
 
