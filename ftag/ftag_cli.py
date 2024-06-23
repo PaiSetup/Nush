@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from tag_engine import TagEngine, TagEngineState
-from utils import error, info, read_indices_or_character, read_tag, read_yes_no, warning
+from utils import error, info, read_indices, read_tag, read_yes_no, warning
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Tag files and generate symlink structures.")
@@ -49,7 +49,6 @@ def initialize_database():
         info(f"Successfully created new ftag database in {engine.get_metadata_file()}")
 
 
-
 def tag_file(engine, file_to_tag):
     print(f"Tagging file {file_to_tag}")
     print()
@@ -67,32 +66,27 @@ def tag_file(engine, file_to_tag):
 
         # Display current value if any
         current_values = engine.get_tags_for_file(file_to_tag, category)
-        if current_values is not None:
-            current_values_indices = [str(available_values.index(x)) for x in current_values]
-            print(f"Current value: {', '.join(current_values)} ( {' '.join(current_values_indices)} )")
+        if current_values is None:
+            current_values_indices = None
+        else:
+            current_values_indices = [available_values.index(x) for x in current_values]
+            current_values_indices_str = [str(x) for x in current_values_indices]
+            print(f"Current value: {', '.join(current_values)} ( {' '.join(current_values_indices_str)} )")
 
         # Read user selection
         while True:
-            indices = read_indices_or_character(len(available_values), "-")
+            indices = read_indices(current_values_indices, len(available_values))
 
-            if indices == "-":
-                # If user selected special '-' index, then use the values, that we
-                # already have from previous runs.
-                if current_values is None:
-                    warning(f'Cannot use "-" character - no previous values')
+            if new_index in indices:
+                # If user selected special NEW index, then try to add a new value to
+                # current category. If could not add (i.e. index already present) then
+                # ignore it.
+                new_value = read_tag()
+                tag_added = engine.add_tag(category, new_value)
+                if not tag_added:
+                    warning(f'Could not add value "{new_value}" to category {category}')
                     continue
-                values = current_values
-            else:
-                if new_index in indices:
-                    # If user selected special NEW index, then try to add a new value to
-                    # current category. If could not add (i.e. index already present) then
-                    # ignore it.
-                    new_value = read_tag()
-                    tag_added = engine.add_tag(category, new_value)
-                    if not tag_added:
-                        warning(f'Could not add value "{new_value}" to category {category}')
-                        continue
-                    available_values = engine.get_tag_values(category)
+                available_values = engine.get_tag_values(category)
 
                 # Use the indices to search through available values.
                 values = [available_values[index] for index in indices]
@@ -118,9 +112,6 @@ def tag_file(engine, file_to_tag):
 
 def generate():
     engine.generate()
-
-
-
 
 
 # Execute main command
