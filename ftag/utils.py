@@ -68,47 +68,47 @@ def read_indices(available_tags, previous_tag_indices, max_index):
 
     def operation():
         # Get an input line and split it.
-        line = input("Indices: ")
-        indices_str = re.split("[ .,]+", line)
-        indices_str = (x.strip() for x in indices_str)
-        indices_str = (x for x in indices_str if len(x) > 0)
-        indices_str = list(indices_str)
-        if len(indices_str) == 0:
+        line = input("Tags: ")
+        tags_str = re.split("[ .,]+", line)
+        tags_str = (x.strip() for x in tags_str)
+        tags_str = (x for x in tags_str if len(x) > 0)
+        tags_str = list(tags_str)
+        if len(tags_str) == 0:
             raise CliException("Specify indices")
 
         # Convert to ints.
         use_previous_character = "-"
-        use_previous = use_previous_character in indices_str
+        use_previous = use_previous_character in tags_str
         if use_previous:
-            indices = previous_tag_indices
+            result = previous_tag_indices
         else:
-            indices = []
+            result = []
 
         # Process all indices.
-        for index_str in indices_str:
-            # Special character is already handled. Ignore it.
-            if index_str == use_previous_character:
+        for tag_str in tags_str:
+            # Special "-" argument is already handled. Ignore it.
+            if tag_str == use_previous_character:
                 continue
 
-            # Handle removing an index.
-            if index_str.startswith(use_previous_character):
+            # Handle removing a tag.
+            if tag_str.startswith(use_previous_character):
                 if not use_previous:
                     raise CliException('A removed tag can only be specified with a "-" argument')
-                index_str = index_str[1:]
-                index = parse_tag_index(index_str)
+                tag_str = tag_str[1:]
+                index = parse_tag_index(tag_str)
                 try:
-                    indices.remove(index)
+                    result.remove(index)
                 except ValueError:
-                    raise CliException(f'Removed tag is not contained within current tags: "{index_str}"')
+                    raise CliException(f'Removed tag is not contained within current tags: "{tag_str}"')
 
             # Handle adding an index.
             else:
-                index = parse_tag_index(index_str)
-                indices.append(index)
+                index = parse_tag_index(tag_str)
+                result.append(index)
 
         # Post-process the indices and return.
-        indices = sort_and_remove_duplicates(indices)
-        return indices
+        result = sort_and_remove_duplicates(result)
+        return result
 
     return run_cli_operation(operation)
 
