@@ -12,7 +12,8 @@ def run_cli_operation(operation, *args, **kwargs):
         try:
             return operation(*args, **kwargs)
         except CliException as e:
-            info(e.message)
+            if e.message is not None:
+                info(e.message)
 
 
 def sort_and_remove_duplicates(list_arg):
@@ -87,7 +88,8 @@ def read_indices(previous_indices, max_index):
 
 def read_yes_no(prompt, empty_lines_threshold=4):
     empty_lines_count = 0
-    while True:
+
+    def operation():
         line = input(f"{prompt} (y/n): ")
         if line == "y":
             return True
@@ -101,14 +103,20 @@ def read_yes_no(prompt, empty_lines_threshold=4):
         else:
             empty_lines_count = 0
 
+        raise CliException(None)
+
+    return run_cli_operation(operation)
+
 
 def read_tag():
-    while True:
+    def operation():
         line = input("Input new tag value: ")
         line = line.strip()
         if len(line) == 0:
-            continue
+            raise CliException(None)
         return line
+
+    return run_cli_operation(operation)
 
 
 def info(*args, **kwargs):
