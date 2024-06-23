@@ -19,8 +19,10 @@ class TagEngineState(enum.Enum):
 
 
 class TagEngineException(Exception):
-    def __init__(self, message):
+    def __init__(self, message, developer_error=False):
         self.message = message
+        if developer_error and message is not None:
+            self.message += " This is a developer error. It should never happen and it's likely a bug in ftag."
 
 
 class TagEngine:
@@ -150,13 +152,14 @@ class TagEngine:
             raise TagEngineException(f'Category name "{category_name}" already exists.')
         self._metadata["tags"][category_name] = []
 
-    def add_tag(self, category, value):
+    def add_tag(self, category, new_tag):
+        if not re.match(name_regex, new_tag):
+            raise TagEngineException(f'Tag name "{new_tag}" is not allowed.')
         if category not in self._metadata["tags"]:
-            raise Exception("Invalid category")  # TODO
-        if value in self._metadata["tags"][category]:
-            return False
-        self._metadata["tags"][category].append(value)
-        return True
+            raise TagEngineException(f'Unknown category "{category}"', developer_error=True)
+        if new_tag in self._metadata["tags"][category]:
+            raise TagEngineException(f'Tag "{new_tag}" already exists')
+        self._metadata["tags"][category].append(new_tag)
 
     def get_tags_for_file(self, file, category):
         file_hash = TagEngine._get_file_hash(file)

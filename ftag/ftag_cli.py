@@ -91,9 +91,11 @@ def tag_file(engine, file_to_tag):
                 # current category. If could not add (i.e. index already present) then
                 # ignore it.
                 new_value = read_tag()
-                tag_added = engine.add_tag(category, new_value)
-                if not tag_added:
-                    warning(f'Could not add value "{new_value}" to category {category}')
+                try:
+                    tag_added = engine.add_tag(category, new_value)
+                except TagEngineException as e:
+                    warning(e.message)
+                    warning(f'Could not add value "{new_value}" to category {category}.')
                     continue
                 available_values = engine.get_tag_values(category)
 
