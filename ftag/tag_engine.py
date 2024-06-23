@@ -1,18 +1,27 @@
+import enum
 import hashlib
 import json
 import os
+import re
 import shutil
-import enum
 from pathlib import Path
 
 tagged_directory_name = "ftags"
 metadata_file_name = "ftags.json"
 metadata_file_name_tmp = "ftags_tmp.json"
+name_regex = "^[A-Za-z][A-Za-z_0-9]*$"
+
 
 class TagEngineState(enum.Enum):
     NotLoaded = enum.auto()
     InvalidData = enum.auto()
     Loaded = enum.auto()
+
+
+class TagEngineException(Exception):
+    def __init__(self, message):
+        self.message = message
+
 
 class TagEngine:
     def __init__(self):
@@ -133,6 +142,13 @@ class TagEngine:
 
     def get_tag_values(self, category):
         return list(self._metadata["tags"][category])
+
+    def add_category(self, category_name):
+        if not re.match(name_regex, category_name):
+            raise TagEngineException(f'Category name "{category_name}" is not allowed.')
+        if category_name in self.get_tag_categories():
+            raise TagEngineException(f'Category name "{category_name}" already exists.')
+        self._metadata["tags"][category_name] = []
 
     def add_tag(self, category, value):
         if category not in self._metadata["tags"]:

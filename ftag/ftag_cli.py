@@ -4,12 +4,13 @@ import argparse
 import sys
 from pathlib import Path
 
-from tag_engine import TagEngine, TagEngineState
+from tag_engine import TagEngine, TagEngineException, TagEngineState
 from utils import error, info, read_indices, read_tag, read_yes_no, warning
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Tag files and generate symlink structures.")
 parser.add_argument("-c", "--create", action="store_true", help="Create new ftag database.")
+parser.add_argument("-a", "--add_category", type=str, help="Add a new category to the ftag database.")
 parser.add_argument("-f", "--file", type=Path, help="Path to the file to tag interactively")
 parser.add_argument("-g", "--generate", action="store_true", help="Generate symlinks")
 args = parser.parse_args()
@@ -47,6 +48,14 @@ def initialize_database():
         error("Failed to create new ftag database")
     else:
         info(f"Successfully created new ftag database in {engine.get_metadata_file()}")
+
+
+def add_category(engine, category_name):
+    try:
+        engine.add_category(category_name)
+    except TagEngineException as e:
+        error(e.message)
+    engine.save()
 
 
 def tag_file(engine, file_to_tag):
@@ -121,6 +130,9 @@ if args.file is not None:
     engine = load_engine()
     print_current_tags(engine, args.file)
     tag_file(engine, args.file)
+elif args.add_category is not None:
+    engine = load_engine()
+    add_category(engine, args.add_category)
 elif args.generate:
     engine = load_engine()
     engine.generate()
