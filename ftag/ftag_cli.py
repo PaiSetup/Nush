@@ -75,7 +75,7 @@ def tag_file(engine, file_to_tag):
 
         # Read user selection
         while True:
-            indices = read_indices(current_values_indices, len(available_values))
+            indices = read_indices(available_values, current_values_indices, len(available_values))
 
             if new_index in indices:
                 # If user selected special NEW index, then try to add a new value to
@@ -88,8 +88,8 @@ def tag_file(engine, file_to_tag):
                     continue
                 available_values = engine.get_tag_values(category)
 
-                # Use the indices to search through available values.
-                values = [available_values[index] for index in indices]
+            # Use the indices to search through available values.
+            values = [available_values[index] for index in indices]
 
             tags[category] = values
             print()

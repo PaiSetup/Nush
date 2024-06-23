@@ -30,7 +30,42 @@ def sort_and_remove_duplicates(list_arg):
     return result
 
 
-def read_indices(previous_indices, max_index):
+def join_human_readable_strings(list_arg):
+    if len(list_arg) == 0:
+        return ""
+    elif len(list_arg) == 1:
+        return list_arg[0]
+    else:
+        result = ", ".join(list_arg[:-1])
+        result += f" and {list_arg[-1]}"
+        return result
+
+
+def read_indices(available_tags, previous_tag_indices, max_index):
+    def parse_tag_index(input_tag):
+        # Try to read as an integer
+        try:
+            index = int(input_tag)
+            if index > max_index:
+                raise CliException(f'Tag index "{index}" is too large')
+            return index
+        except ValueError:
+            pass
+
+        # Try to match as string prefix.
+        matching_indices = []
+        matching_tags = []
+        input_tag = input_tag.lower()
+        for index, tag in enumerate(available_tags):
+            if tag.lower().startswith(input_tag):
+                matching_indices.append(index)
+                matching_tags.append(tag)
+        if len(matching_indices) == 0:
+            raise CliException(f'Invalid tag specified: "{input_tag}"')
+        elif len(matching_indices) != 1:
+            raise CliException(f'Cannot match "{input_tag}" to a specific tag. It matches {join_human_readable_strings(matching_tags)}.')
+        return matching_indices[0]
+
     def operation():
         # Get an input line and split it.
         line = input("Indices: ")
@@ -45,7 +80,7 @@ def read_indices(previous_indices, max_index):
         use_previous_character = "-"
         use_previous = use_previous_character in indices_str
         if use_previous:
-            indices = previous_indices
+            indices = previous_tag_indices
         else:
             indices = []
 
@@ -60,10 +95,7 @@ def read_indices(previous_indices, max_index):
                 if not use_previous:
                     raise CliException('A removed tag can only be specified with a "-" argument')
                 index_str = index_str[1:]
-                try:
-                    index = int(index_str)
-                except ValueError:
-                    raise CliException(f'Invalid tag index specified: "{index_str}"')
+                index = parse_tag_index(index_str)
                 try:
                     indices.remove(index)
                 except ValueError:
@@ -71,12 +103,7 @@ def read_indices(previous_indices, max_index):
 
             # Handle adding an index.
             else:
-                try:
-                    index = int(index_str)
-                except ValueError:
-                    raise CliException(f'Invalid tag index specified: "{index_str}"')
-                if index > max_index:
-                    raise CliException(f'Tag index "{index}" is too large')
+                index = parse_tag_index(index_str)
                 indices.append(index)
 
         # Post-process the indices and return.
