@@ -107,7 +107,17 @@ class TagEngine:
                     continue
                 yield file_path
 
-    def generate(self):
+    def generate_all_files(self, cleanup):
+        if cleanup:
+            symlink_root = self._get_symlink_root()
+            if symlink_root.exists():
+                shutil.rmtree(symlink_root)
+
+        for file_path in self._get_taggable_files():
+            self.generate_file(file_path)
+
+    def generate_file(self, file_path):
+        # Define a helper function for generating a symlink.
         def symlink(real_file_path, symlink_dir, file_hash):
             real_file_path = Path(real_file_path).absolute()
             symlink_dir = Path(symlink_dir).absolute()
@@ -119,21 +129,22 @@ class TagEngine:
                 symlink_path.unlink()
             os.symlink(real_file_path, symlink_path)
 
-        for file_path in self._get_taggable_files():
-            file_hash = TagEngine._get_file_hash(file_path)
-            if file_hash is None:
-                print(f"File {file_path} does not exist")
-                continue
-            if file_hash not in self._metadata["files"]:
-                # print(f"No tags for {file_path}")
-                continue
+        # Calculate hash of the file.
+        file_hash = TagEngine._get_file_hash(file_path)
+        if file_hash is None:
+            print(f"File {file_path} does not exist")
+            return
 
-            file_tags = self._metadata["files"][file_hash]["tags"]
-            # print(f"Symlinking {file_path} {file_hash}")
-            for category, values in file_tags.items():
-                for value in values:
-                    symlink_dir = f"{self._get_symlink_root()}/{category}/{value}"
-                    symlink(file_path, symlink_dir, file_hash)
+        # Early return if this file is not tagged.
+        if file_hash not in self._metadata["files"]:
+            return
+
+        # Iterate over all tags assigned to this file and generate symlinks for each one.
+        file_tags = self._metadata["files"][file_hash]["tags"]
+        for category, values in file_tags.items():
+            for value in values:
+                symlink_dir = f"{self._get_symlink_root()}/{category}/{value}"
+                symlink(file_path, symlink_dir, file_hash)
 
     def dump_raw_metadata_to_console(self):
         print(json.dumps(self._metadata, indent=4))

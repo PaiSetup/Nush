@@ -114,23 +114,14 @@ def tag_file(engine, file_to_tag):
             print()
             break
 
-    # Display confirmation
-    # print(f"File: {file_to_tag}")
-    # print("Tags:")
-    # for category, values in tags.items():
-    #     print(f"    {category}: {', '.join(values)}")
-    # if not read_yes_no("Proceed?"):
-    #     print("Exiting without tagging.")
-    #     return
-    # print()
-
     engine.set_tags(file_to_tag, tags)
     engine.save()
-    engine.generate()
+    engine.generate_file(file_to_tag)
 
 
 def generate():
-    engine.generate()
+    engine = load_engine()
+    engine.generate_all_files(True)
 
 
 # Execute main command
@@ -144,8 +135,7 @@ elif args.add_category is not None:
     engine = load_engine()
     add_category(engine, args.add_category)
 elif args.generate:
-    engine = load_engine()
-    engine.generate()
+    generate()
 elif args.create:
     initialize_database()
 else:
