@@ -54,7 +54,7 @@ def join_selected_tags_names(tags, available_tags):
     return f"{tags_str} ( {indices_str} )"
 
 
-def read_indices(available_tags, previous_tag_indices, max_index):
+def read_indices(previous_tags, available_tags, max_index):
     def parse_tag_index(input_tag):
         # Try to read as an integer
         try:
@@ -91,9 +91,9 @@ def read_indices(available_tags, previous_tag_indices, max_index):
         use_previous_character = "-"
         use_previous = use_previous_character in tags_str
         if use_previous:
-            if previous_tag_indices is None:
+            if previous_tags is None:
                 raise CliException('Cannot use a "-" argument - tags are uninitialized')
-            result = previous_tag_indices
+            result = [available_tags.index(x) for x in previous_tags]
         else:
             result = []
 

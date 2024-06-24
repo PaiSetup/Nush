@@ -81,14 +81,9 @@ def tag_file(engine, file_to_tag):
         current_values = engine.get_tags_for_file(file_to_tag, category)
         print(f"Current tags: {join_selected_tags_names(current_values, available_values)}")
 
-        if current_values is None:
-            current_values_indices = None
-        else:
-            current_values_indices = [available_values.index(x) for x in current_values]
-
         # Read user selection
         while True:
-            indices = read_indices(available_values, current_values_indices, len(available_values))
+            indices = read_indices(current_values, available_values, len(available_values))
 
             if new_index in indices:
                 # If user selected special NEW index, then try to add a new value to
