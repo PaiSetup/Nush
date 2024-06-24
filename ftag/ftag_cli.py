@@ -25,16 +25,6 @@ parser.add_argument("-t", "--tag_all", action="store_true", help="Iterate over a
 args = parser.parse_args()
 
 
-# Definitions of main command functions
-def print_current_tags(engine, file_to_tag):
-    print(f"Current tags for file {file_to_tag}")
-    for category in engine.get_tag_categories():
-        available_values = engine.get_tag_values(category)
-        current_values = engine.get_tags_for_file(file_to_tag, category)
-        print(f"  {category}: {join_selected_tags_names(current_values, available_values)}")
-    print()
-
-
 def load_engine():
     engine = TagEngine()
     if engine.get_state() != TagEngineState.Loaded:
@@ -65,6 +55,10 @@ def add_category(engine, category_name):
 
 def tag_file(engine, file_to_tag, only_uninitialized_categories):
     print(f"Tagging file {file_to_tag}")
+    for category in engine.get_tag_categories():
+        available_values = engine.get_tag_values(category)
+        current_values = engine.get_tags_for_file(file_to_tag, category)
+        print(f"  {category}: {join_selected_tags_names(current_values, available_values)}")
     print()
 
     # Select tag values for each available tag category
@@ -132,7 +126,6 @@ if args.file is not None:
     if not args.file.is_file():
         error(f"invalid file {args.file}")
     engine = load_engine()
-    print_current_tags(engine, args.file)
     tag_file(engine, args.file, False)
 elif args.tag_all:
     tag_all()
