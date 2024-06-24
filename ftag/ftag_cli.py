@@ -5,26 +5,10 @@ import sys
 from pathlib import Path
 
 from tag_engine import TagEngine, TagEngineException, TagEngineState
-from utils import (
-    error,
-    info,
-    join_selected_tags_names,
-    read_indices,
-    read_tag,
-    read_yes_no,
-    warning,
-)
-
-# Parse arguments
-parser = argparse.ArgumentParser(description="Tag files and generate symlink structures.")
-parser.add_argument("-c", "--create", action="store_true", help="Create new ftag database.")
-parser.add_argument("-a", "--add_category", type=str, help="Add a new category to the ftag database.")
-parser.add_argument("-f", "--file", type=Path, help="Path to the file to tag interactively")
-parser.add_argument("-g", "--generate", action="store_true", help="Generate symlinks")
-parser.add_argument("-t", "--tag_all", action="store_true", help="Iterate over all untagged files and tag them.")
-args = parser.parse_args()
+from utils import *
 
 
+# ------------------------------------- Helper functions
 def load_engine():
     engine = TagEngine()
     if engine.get_state() != TagEngineState.Loaded:
@@ -32,6 +16,7 @@ def load_engine():
     return engine
 
 
+# ------------------------------------- Core operations
 def initialize_database():
     engine = TagEngine()
     if engine.get_state() != TagEngineState.NotLoaded:
@@ -51,6 +36,15 @@ def add_category(engine, category_name):
     except TagEngineException as e:
         error(e.message)
     engine.save()
+
+
+def generate(engine):
+    engine.generate_all_files(True)
+
+
+def tag_all(engine):
+    for file_to_tag in engine.get_untagged_files():
+        tag_file(engine, file_to_tag, True)
 
 
 def tag_file(engine, file_to_tag, only_uninitialized_categories):
@@ -110,33 +104,33 @@ def tag_file(engine, file_to_tag, only_uninitialized_categories):
     engine.generate_file(file_to_tag)
 
 
-def generate():
-    engine = load_engine()
-    engine.generate_all_files(True)
+# ------------------------------------- Main procedure
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Tag files and generate symlink structures.")
+    parser.add_argument("-i", "--initialize", action="store_true", help="Create new ftag database. Fails if database is already created.")
+    parser.add_argument("-c", "--add_category", type=str, help="Add a new category to the ftag database.")
+    parser.add_argument("-g", "--generate", action="store_true", help="Generate symlinks")
+    parser.add_argument("-t", "--tag_all", action="store_true", help="Iterate over all untagged files and tag them.")
+    parser.add_argument("-f", "--file", type=Path, help="Path to the file to tag interactively")
+    args = parser.parse_args()
 
-
-def tag_all():
-    engine = load_engine()
-    for file_to_tag in engine.get_untagged_files():
-        tag_file(engine, file_to_tag, True)
-
-
-# Execute main command
-if args.file is not None:
-    if not args.file.is_file():
-        error(f"invalid file {args.file}")
-    engine = load_engine()
-    tag_file(engine, args.file, False)
-elif args.tag_all:
-    tag_all()
-elif args.add_category is not None:
-    engine = load_engine()
-    add_category(engine, args.add_category)
-elif args.generate:
-    generate()
-elif args.create:
-    initialize_database()
-else:
-    parser.print_help()
-    print()
-    error("no action")
+    if args.initialize:
+        initialize_database()
+    elif args.add_category:
+        engine = load_engine()
+        add_category(engine, args.add_category)
+    elif args.generate:
+        engine = load_engine()
+        generate(engine)
+    elif args.tag_all:
+        engine = load_engine()
+        tag_all(engine)
+    elif args.file:
+        if not args.file.is_file():
+            error(f"invalid file {args.file}")
+        engine = load_engine()
+        tag_file(engine, args.file, False)
+    else:
+        parser.print_help()
+        print()
+        error("no action")
