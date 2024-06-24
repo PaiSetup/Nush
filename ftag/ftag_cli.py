@@ -30,11 +30,7 @@ def print_current_tags(engine, file_to_tag):
     for category in engine.get_tag_categories():
         available_values = engine.get_tag_values(category)
         current_values = engine.get_tags_for_file(file_to_tag, category)
-        if current_values is not None:
-            current_values_indices = [str(available_values.index(x)) for x in current_values]
-            print(f"  {category}: {', '.join(current_values)} ( {' '.join(current_values_indices)} )")
-        else:
-            print(f"  {category}: NONE")
+        print(f"  {category}: {join_selected_tags_names(current_values, available_values)}")
     print()
 
 
@@ -83,11 +79,12 @@ def tag_file(engine, file_to_tag):
 
         # Display current value if any
         current_values = engine.get_tags_for_file(file_to_tag, category)
+        print(f"Current tags: {join_selected_tags_names(current_values, available_values)}")
+
         if current_values is None:
             current_values_indices = None
         else:
             current_values_indices = [available_values.index(x) for x in current_values]
-            print(f"Current tags: {join_selected_tags_names(current_values, available_values)}")
 
         # Read user selection
         while True:

@@ -42,6 +42,11 @@ def join_human_readable_strings(list_arg):
 
 
 def join_selected_tags_names(tags, available_tags):
+    if tags is None:
+        return "<UNINITIALIZED>"
+    if len(tags) == 0:
+        return "<EMPTY>"
+
     indices = [str(available_tags.index(x)) for x in tags]
 
     indices_str = " ".join(indices)
@@ -81,8 +86,6 @@ def read_indices(available_tags, previous_tag_indices, max_index):
         tags_str = (x.strip() for x in tags_str)
         tags_str = (x for x in tags_str if len(x) > 0)
         tags_str = list(tags_str)
-        if len(tags_str) == 0:
-            raise CliException("Specify indices")
 
         # Convert to ints.
         use_previous_character = "-"
