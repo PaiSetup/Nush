@@ -107,6 +107,18 @@ class TagEngine:
                     continue
                 yield file_path
 
+    def get_untagged_files(self):
+        def is_untagged(file_path, categories):
+            file_hash = TagEngine._get_file_hash(file_path)
+            if file_hash not in self._metadata["files"]:
+                return True
+
+            file_tags = list(self._metadata["files"][file_hash]["tags"].keys())
+            return any((c not in file_tags for c in categories))
+
+        categories = self.get_tag_categories()
+        return (f for f in self._get_taggable_files() if is_untagged(f, categories))
+
     def generate_all_files(self, cleanup):
         if cleanup:
             symlink_root = self._get_symlink_root()

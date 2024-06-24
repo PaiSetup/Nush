@@ -21,6 +21,7 @@ parser.add_argument("-c", "--create", action="store_true", help="Create new ftag
 parser.add_argument("-a", "--add_category", type=str, help="Add a new category to the ftag database.")
 parser.add_argument("-f", "--file", type=Path, help="Path to the file to tag interactively")
 parser.add_argument("-g", "--generate", action="store_true", help="Generate symlinks")
+parser.add_argument("-t", "--tag_all", action="store_true", help="Iterate over all untagged files and tag them.")
 args = parser.parse_args()
 
 
@@ -116,6 +117,12 @@ def generate():
     engine.generate_all_files(True)
 
 
+def tag_all():
+    engine = load_engine()
+    for file_to_tag in engine.get_untagged_files():
+        tag_file(engine, file_to_tag)
+
+
 # Execute main command
 if args.file is not None:
     if not args.file.is_file():
@@ -123,6 +130,8 @@ if args.file is not None:
     engine = load_engine()
     print_current_tags(engine, args.file)
     tag_file(engine, args.file)
+elif args.tag_all:
+    tag_all()
 elif args.add_category is not None:
     engine = load_engine()
     add_category(engine, args.add_category)
