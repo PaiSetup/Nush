@@ -88,6 +88,8 @@ def read_indices(available_tags, previous_tag_indices, max_index):
         use_previous_character = "-"
         use_previous = use_previous_character in tags_str
         if use_previous:
+            if previous_tag_indices is None:
+                raise CliException('Cannot use a "-" argument - tags are uninitialized')
             result = previous_tag_indices
         else:
             result = []
