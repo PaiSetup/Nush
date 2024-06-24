@@ -11,22 +11,15 @@
         "37dd9d555eea526af74c1b1eb02e286717f687645cc97d10": {
             "path": "blue.txt",
             "tags": {
-                "color": [
-                    "blue",
-                    "fixed"
-                ],
-                "smell": [
-                    "lel"
-                ]
+                "color": [],
+                "smell": []
             }
         },
         "3fa6a605c63f3e3b4beb39fc42db7737169f4a77e4cc3084": {
             "path": "yellow.txt",
             "tags": {
-                "color": [
-                    "green",
-                    "red"
-                ]
+                "color": [],
+                "smell": []
             }
         },
         "ccd823caf8108f62c012b02d4c233da76eacf9fdea959b9d": {
@@ -42,6 +35,29 @@
                     "lel"
                 ]
             }
+        },
+        "d23b84de7bd1374629dcb57b0d6d33b984da428a9c5f1918": {
+            "path": "/home/maciej/scripts/ftag/example/one_category/red.txt",
+            "tags": {
+                "color": [
+                    "red"
+                ],
+                "smell": [
+                    "kek"
+                ]
+            }
+        },
+        "82838917f29dff91022065550b1ae906f73ecf0a4310a38a": {
+            "path": "/home/maciej/scripts/ftag/example/one_category/.gitignore",
+            "tags": {
+                "color": [
+                    "blue",
+                    "green"
+                ],
+                "smell": [
+                    "kek"
+                ]
+            }
         }
     },
     "tags": {
@@ -55,7 +71,8 @@
             "fixed"
         ],
         "smell": [
-            "lel"
+            "lel",
+            "kek"
         ]
     }
 }

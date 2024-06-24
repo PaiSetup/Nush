@@ -63,13 +63,18 @@ def add_category(engine, category_name):
     engine.save()
 
 
-def tag_file(engine, file_to_tag):
+def tag_file(engine, file_to_tag, only_uninitialized_categories):
     print(f"Tagging file {file_to_tag}")
     print()
 
     # Select tag values for each available tag category
     tags = {}
     for category in engine.get_tag_categories():
+        current_values = engine.get_tags_for_file(file_to_tag, category)
+        if only_uninitialized_categories and current_values is not None:
+            tags[category] = current_values
+            continue
+
         # Display values for this category
         print(f"CATEGORY {category}:")
         available_values = engine.get_tag_values(category)
@@ -79,7 +84,6 @@ def tag_file(engine, file_to_tag):
         print(f"  {new_index: >2}: NEW")
 
         # Display current value if any
-        current_values = engine.get_tags_for_file(file_to_tag, category)
         print(f"Current tags: {join_selected_tags_names(current_values, available_values)}")
 
         # Read user selection
@@ -120,7 +124,7 @@ def generate():
 def tag_all():
     engine = load_engine()
     for file_to_tag in engine.get_untagged_files():
-        tag_file(engine, file_to_tag)
+        tag_file(engine, file_to_tag, True)
 
 
 # Execute main command
@@ -129,7 +133,7 @@ if args.file is not None:
         error(f"invalid file {args.file}")
     engine = load_engine()
     print_current_tags(engine, args.file)
-    tag_file(engine, args.file)
+    tag_file(engine, args.file, False)
 elif args.tag_all:
     tag_all()
 elif args.add_category is not None:
