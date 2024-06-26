@@ -1,38 +1,19 @@
 {
     "files": {
-        "786a02f742015903c6c6fd852552d272912f4740e1584761": {
-            "path": "blue.txt",
+        "3fa6a605c63f3e3b4beb39fc42db7737169f4a77e4cc3084": {
+            "path": "/home/maciej/scripts/ftag/example/one_category/yellow.txt",
             "tags": {
                 "color": [
-                    "blue"
+                    "red",
+                    "green"
                 ]
             }
         },
         "37dd9d555eea526af74c1b1eb02e286717f687645cc97d10": {
-            "path": "blue.txt",
-            "tags": {
-                "color": [],
-                "smell": []
-            }
-        },
-        "3fa6a605c63f3e3b4beb39fc42db7737169f4a77e4cc3084": {
-            "path": "yellow.txt",
-            "tags": {
-                "color": [],
-                "smell": []
-            }
-        },
-        "ccd823caf8108f62c012b02d4c233da76eacf9fdea959b9d": {
-            "path": "green.txt",
+            "path": "/home/maciej/scripts/ftag/example/one_category/blue.txt",
             "tags": {
                 "color": [
-                    "blue",
-                    "red",
-                    "green",
-                    "other"
-                ],
-                "smell": [
-                    "lel"
+                    "blue"
                 ]
             }
         },
@@ -41,21 +22,14 @@
             "tags": {
                 "color": [
                     "red"
-                ],
-                "smell": [
-                    "kek"
                 ]
             }
         },
-        "82838917f29dff91022065550b1ae906f73ecf0a4310a38a": {
-            "path": "/home/maciej/scripts/ftag/example/one_category/.gitignore",
+        "ccd823caf8108f62c012b02d4c233da76eacf9fdea959b9d": {
+            "path": "/home/maciej/scripts/ftag/example/one_category/green.txt",
             "tags": {
                 "color": [
-                    "blue",
                     "green"
-                ],
-                "smell": [
-                    "kek"
                 ]
             }
         }
@@ -65,14 +39,7 @@
             "blue",
             "red",
             "green",
-            "other",
-            "fucked",
-            "fair",
-            "fixed"
-        ],
-        "smell": [
-            "lel",
-            "kek"
+            "other"
         ]
     }
 }
