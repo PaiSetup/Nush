@@ -208,7 +208,7 @@ class TagEngine:
         # is constant. Hash is unique identifier. Path is only for sanity checks, but it's not used.
         if file_hash not in self._metadata["files"]:
             self._metadata["files"][file_hash] = {
-                "path": str(file),
+                "path": str(file.absolute().relative_to(self._get_root_dir_path())),
                 "tags": {},
             }
 

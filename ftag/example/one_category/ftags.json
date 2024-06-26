@@ -1,7 +1,7 @@
 {
     "files": {
         "3fa6a605c63f3e3b4beb39fc42db7737169f4a77e4cc3084": {
-            "path": "/home/maciej/scripts/ftag/example/one_category/yellow.txt",
+            "path": "yellow.txt",
             "tags": {
                 "color": [
                     "red",
@@ -10,7 +10,7 @@
             }
         },
         "37dd9d555eea526af74c1b1eb02e286717f687645cc97d10": {
-            "path": "/home/maciej/scripts/ftag/example/one_category/blue.txt",
+            "path": "blue.txt",
             "tags": {
                 "color": [
                     "blue"
@@ -18,7 +18,7 @@
             }
         },
         "d23b84de7bd1374629dcb57b0d6d33b984da428a9c5f1918": {
-            "path": "/home/maciej/scripts/ftag/example/one_category/red.txt",
+            "path": "red.txt",
             "tags": {
                 "color": [
                     "red"
@@ -26,7 +26,7 @@
             }
         },
         "ccd823caf8108f62c012b02d4c233da76eacf9fdea959b9d": {
-            "path": "/home/maciej/scripts/ftag/example/one_category/green.txt",
+            "path": "green.txt",
             "tags": {
                 "color": [
                     "green"
