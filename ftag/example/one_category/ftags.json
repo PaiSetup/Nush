@@ -1,4 +1,12 @@
 {
+    "filters": {
+        "mime": [
+            "^text/"
+        ],
+        "path": [
+            "\\.txt$"
+        ]
+    },
     "files": {
         "3fa6a605c63f3e3b4beb39fc42db7737169f4a77e4cc3084": {
             "path": "yellow.txt",

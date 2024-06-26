@@ -1,12 +1,13 @@
 import enum
 import os
 import random
+import re
 import shutil
 from pathlib import Path
 
 from engine.exception import TagEngineException
-from engine.hash import get_file_hash
 from engine.metadata import TagEngineMetadata
+from engine.misc import get_file_hash, get_file_mime_type
 
 tagged_directory_name = "ftags"
 metadata_file_name = "ftags.json"
@@ -80,20 +81,53 @@ class TagEngine:
     def _get_taggable_files(self):
         for root, dirs, files in os.walk(self._get_root_dir_path()):
             for file_name in files:
+                if file_name == metadata_file_name:
+                    continue
+
                 file_path = Path(os.path.abspath(os.path.join(root, file_name)))
                 if file_path.is_relative_to(self._get_symlink_root()):
                     continue
-                if file_name == metadata_file_name:
-                    continue
+                file_path = file_path.absolute().relative_to(self._get_root_dir_path())
+
                 yield file_path
+
+    def _matches_mime_filters(self, file_path):
+        mime_filters = self._metadata.get_mime_filters()
+        if len(mime_filters) == 0:
+            return True
+
+        mime_type = get_file_mime_type(file_path)
+        if mime_type is None:
+            return False
+
+        for mime_filter in mime_filters:
+            if re.match(mime_filter, mime_type):
+                return True
+        return False
+
+    def _matches_path_filters(self, file_path):
+        path_filters = self._metadata.get_path_filters()
+        if len(path_filters) == 0:
+            return True
+
+        for path_filter in path_filters:
+            file_path = str(file_path)
+            if re.search(path_filter, str(file_path)):
+                return True
+        return False
 
     def get_untagged_files(self, randomize=True):
         categories = self._metadata.get_categories()
         files = self._get_taggable_files()
+
         if randomize:
             files = list(files)
             random.shuffle(files)
-        return (f for f in files if self._metadata.is_untagged(f, categories))
+
+        files = (f for f in files if self._metadata.is_untagged(f, categories))
+        files = (f for f in files if self._matches_path_filters(f))
+        files = (f for f in files if self._matches_mime_filters(f))
+        return files
 
     def generate_all_symlinks(self, cleanup):
         if cleanup:
@@ -118,6 +152,7 @@ class TagEngine:
             os.symlink(real_file_path, symlink_path)
 
         # Calculate hash of the file.
+        # TODO remove this?
         file_hash = get_file_hash(file_path)
         if file_hash is None:
             print(f"File {file_path} does not exist")
@@ -140,6 +175,12 @@ class TagEngine:
 
     def add_category(self, category):
         self._metadata.add_category(category)
+
+    def add_mime_filter(self, new_filter):
+        self._metadata.add_mime_filter(new_filter)
+
+    def add_path_filter(self, new_filter):
+        self._metadata.add_path_filter(new_filter)
 
     def add_tag(self, category, new_tag):
         self._metadata.add_tag(category, new_tag)

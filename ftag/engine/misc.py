@@ -1,4 +1,5 @@
 import hashlib
+import mimetypes
 import os
 
 
@@ -18,3 +19,7 @@ def get_file_hash(file_path):
             hash_function.update(chunk)
             bytes_left -= current_chunk_size
     return hash_function.hexdigest()[0:48]
+
+
+def get_file_mime_type(file_path):
+    return mimetypes.guess_type(file_path)[0]

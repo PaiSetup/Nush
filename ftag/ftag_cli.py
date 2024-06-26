@@ -39,6 +39,16 @@ def add_category(engine, category):
     engine.save()
 
 
+def add_mime_filter(engine, new_filter):
+    engine.add_mime_filter(new_filter)
+    engine.save()
+
+
+def add_path_filter(engine, new_filter):
+    engine.add_path_filter(new_filter)
+    engine.save()
+
+
 def generate(engine):
     engine.generate_all_symlinks(True)
 
@@ -113,9 +123,13 @@ def tag_file(engine, file_to_tag, only_uninitialized_categories):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tag files and generate symlink structures.")
 
+    filters_help = "Filters are used by --tag_all option. In case of multiple filters of given type, at least one must be satisfied."
+
     config_args = parser.add_argument_group("Database configuration")
     config_args.add_argument("-i", "--initialize", action="store_true", help="Create new ftag database. Fails if database is already created.")
     config_args.add_argument("-c", "--add_category", type=str, help="Add a new category to the ftag database.")
+    config_args.add_argument("-m", "--add_mime_filter", type=str, help=f"Add a new mime filter as a regex checked against mime type. {filters_help}")
+    config_args.add_argument("-p", "--add_path_filter", type=str, help=f"Add a new path filter as a regex checked against file path. {filters_help}")
     tagging_args = parser.add_argument_group("File operations")
     tagging_args.add_argument("-g", "--generate", action="store_true", help="Generate symlinks")
     tagging_args.add_argument("-t", "--tag_all", action="store_true", help="Iterate over all untagged files and tag them.")
@@ -127,6 +141,12 @@ if __name__ == "__main__":
     elif args.add_category:
         engine = load_engine()
         add_category(engine, args.add_category)
+    elif args.add_mime_filter:
+        engine = load_engine()
+        add_mime_filter(engine, args.add_mime_filter)
+    elif args.add_path_filter:
+        engine = load_engine()
+        add_path_filter(engine, args.add_path_filter)
     elif args.generate:
         engine = load_engine()
         generate(engine)

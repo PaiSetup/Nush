@@ -3,7 +3,7 @@ import re
 import shutil
 
 from engine.exception import TagEngineException
-from engine.hash import get_file_hash
+from engine.misc import get_file_hash
 
 name_regex = "^[A-Za-z][A-Za-z_0-9]*$"
 
@@ -18,6 +18,10 @@ class TagEngineMetadata:
     def load_empty(self):
         self._metadata = {
             "files": {},
+            "filters": {
+                "mime": [],
+                "path": [],
+            },
             "tags": {},
         }
 
@@ -26,6 +30,8 @@ class TagEngineMetadata:
             self._metadata = json.load(file)
 
         # Simple basic validation
+        if "filters" not in self._metadata:
+            return False
         if "files" not in self._metadata:
             return False
         if "tags" not in self._metadata:
@@ -43,6 +49,12 @@ class TagEngineMetadata:
 
         file_tags = list(self._metadata["files"][file_hash]["tags"].keys())
         return any((c not in file_tags for c in categories))
+
+    def get_mime_filters(self):
+        return self._metadata["filters"]["mime"]
+
+    def get_path_filters(self):
+        return self._metadata["filters"]["path"]
 
     def get_categories(self):
         return list(self._metadata["tags"].keys())
@@ -72,6 +84,14 @@ class TagEngineMetadata:
         if category in self._metadata["tags"]:
             raise TagEngineException(f'Category name "{category}" already exists.')
         self._metadata["tags"][category] = []
+
+    def add_mime_filter(self, new_filter):
+        if new_filter not in self._metadata["filters"]["mime"]:
+            self._metadata["filters"]["mime"].append(new_filter)
+
+    def add_path_filter(self, new_filter):
+        if new_filter not in self._metadata["filters"]["path"]:
+            self._metadata["filters"]["path"].append(new_filter)
 
     def add_tag(self, category, new_tag):
         if not re.match(name_regex, new_tag):
