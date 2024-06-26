@@ -6,6 +6,7 @@ from engine.exception import TagEngineException
 from engine.misc import get_file_hash
 
 name_regex = "^[A-Za-z][A-Za-z_0-9]*$"
+backup_version_interval = 5
 
 
 class TagEngineMetadata:
@@ -23,28 +24,36 @@ class TagEngineMetadata:
                 "path": [],
             },
             "tags": {},
+            "version": 0,
         }
 
     def load(self, metadata_file_path):
         with open(metadata_file_path, "r") as file:
             self._metadata = json.load(file)
 
-        def raiseException(msg):
-            raise TagEngineException(f"Metadata seems to be incorrect. {msg}")
+        def require_field(field):
+            if field not in self._metadata:
+                raise TagEngineException('Metadata seems to be incorrect. Field "filters" does not exist.')
 
         # Simple basic validation
-        if "filters" not in self._metadata:
-            raiseException('Field "filters" does not exist.')
-        if "files" not in self._metadata:
-            raiseException('Field "files" does not exist.')
-        if "tags" not in self._metadata:
-            raiseException('Field "tags" does not exist.')
+        require_field("filters")
+        require_field("files")
+        require_field("tags")
+        require_field("version")
 
     def save(self, metadata_file_path, tmp_file):
+        self._metadata["version"] += 1
+
         metadata_file_path.parent.mkdir(exist_ok=True, parents=False)
         with open(tmp_file, "w") as file:
             content = json.dump(self._metadata, file, indent=4)
         shutil.move(tmp_file, metadata_file_path)
+
+        if self._metadata["version"] % backup_version_interval == 0:
+            backup_version = str(self._metadata["version"]).zfill(4)
+            backup_file_name = f"{metadata_file_path.stem}_v{backup_version}{metadata_file_path.suffix}"
+            backup_file_path = metadata_file_path.parent / backup_file_name
+            shutil.copy(metadata_file_path, backup_file_path)
 
     def is_untagged(self, file_path, categories):
         file_hash = get_file_hash(file_path)
