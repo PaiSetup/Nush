@@ -13,6 +13,7 @@ def load_engine():
     engine = TagEngine()
     if engine.get_state() != TagEngineState.Loaded:
         error("Failed to load ftags metadata")
+    print(f"Ftag database found at {engine.get_metadata_file()}")
     return engine
 
 
