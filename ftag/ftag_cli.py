@@ -118,7 +118,6 @@ def tag_file(engine, file_to_tag, only_uninitialized_categories):
 
     engine.set_tags(file_to_tag, tags)
     engine.save()
-    engine.generate_symlink(file_to_tag)
 
 
 # ------------------------------------- Main procedure

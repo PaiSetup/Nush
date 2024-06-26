@@ -136,28 +136,31 @@ class TagEngine:
                 shutil.rmtree(symlink_root)
 
         for file_path in self._get_taggable_files():
-            self.generate_symlink(file_path)
+            self._generate_symlinks(file_path)
 
-    def generate_symlink(self, file_path):
-        # Define a helper function for generating a symlink.
-        def symlink(real_file_path, symlink_dir, file_hash):
-            real_file_path = Path(real_file_path).absolute()
-            symlink_dir = Path(symlink_dir).absolute()
-
-            symlink_dir.mkdir(parents=True, exist_ok=True)
-            symlink_name = f"{file_hash}{real_file_path.suffix}"
-            symlink_path = symlink_dir / symlink_name
-            if symlink_path.exists():
-                symlink_path.unlink()
-            os.symlink(real_file_path, symlink_path)
-
-        # Calculate hash of the file.
-        # TODO remove this?
+    def _get_symlink_path(self, category, value, file_path):
         file_hash = get_file_hash(file_path)
-        if file_hash is None:
-            print(f"File {file_path} does not exist")
+        symlink_dir = self._get_symlink_root() / category / value
+        symlink_name = f"{file_hash}{file_path.suffix}"
+        return symlink_dir / symlink_name
+
+    def _remove_symlinks(self, file_path):
+        # Get tags of the file as a dictionary - key is category name, value is list of tags
+        try:
+            file_tags = self._metadata.get_tags_for_file(file_path, None)
+        except TagEngineException as e:
+            file_tags = None
+            print(e.message)
+        if file_tags is None:
             return
 
+        # Iterate over all tags assigned to this file and remove its symlinks
+        for category, values in file_tags.items():
+            for value in values:
+                symlink_path = self._get_symlink_path(category, value, file_path)
+                symlink_path.unlink(missing_ok=True)
+
+    def _generate_symlinks(self, file_path):
         # Get tags of the file as a dictionary - key is category name, value is list of tags
         try:
             file_tags = self._metadata.get_tags_for_file(file_path, None)
@@ -168,10 +171,13 @@ class TagEngine:
             return
 
         # Iterate over all tags assigned to this file and generate symlinks for each one.
+        file_path_absolute = file_path.absolute()
         for category, values in file_tags.items():
             for value in values:
-                symlink_dir = f"{self._get_symlink_root()}/{category}/{value}"
-                symlink(file_path, symlink_dir, file_hash)
+                symlink_path = self._get_symlink_path(category, value, file_path)
+                symlink_path.parent.mkdir(parents=True, exist_ok=True)
+                symlink_path.unlink(missing_ok=True)
+                os.symlink(file_path_absolute, symlink_path)
 
     def add_category(self, category):
         self._metadata.add_category(category)
@@ -191,4 +197,6 @@ class TagEngine:
         return self._metadata.get_tags_for_file(file_path, category)
 
     def set_tags(self, file_path, tags):
+        self._remove_symlinks(file_path)
         self._metadata.set_tags(file_path, tags, self._get_root_dir_path())
+        self._generate_symlinks(file_path)
