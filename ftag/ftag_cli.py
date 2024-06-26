@@ -21,7 +21,7 @@ def load_engine():
 def initialize_database():
     engine = TagEngine()
     if engine.get_state() != TagEngineState.NotLoaded:
-        error(f"Ftag database is already created: {self.get_metadata_file()}")
+        error(f"Ftag database is already created: {engine.get_metadata_file()}")
     engine.initialize()
 
     engine = TagEngine()
@@ -112,11 +112,14 @@ def tag_file(engine, file_to_tag, only_uninitialized_categories):
 # ------------------------------------- Main procedure
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tag files and generate symlink structures.")
-    parser.add_argument("-i", "--initialize", action="store_true", help="Create new ftag database. Fails if database is already created.")
-    parser.add_argument("-c", "--add_category", type=str, help="Add a new category to the ftag database.")
-    parser.add_argument("-g", "--generate", action="store_true", help="Generate symlinks")
-    parser.add_argument("-t", "--tag_all", action="store_true", help="Iterate over all untagged files and tag them.")
-    parser.add_argument("-f", "--file", type=Path, help="Path to the file to tag interactively")
+
+    config_args = parser.add_argument_group("Database configuration")
+    config_args.add_argument("-i", "--initialize", action="store_true", help="Create new ftag database. Fails if database is already created.")
+    config_args.add_argument("-c", "--add_category", type=str, help="Add a new category to the ftag database.")
+    tagging_args = parser.add_argument_group("File operations")
+    tagging_args.add_argument("-g", "--generate", action="store_true", help="Generate symlinks")
+    tagging_args.add_argument("-t", "--tag_all", action="store_true", help="Iterate over all untagged files and tag them.")
+    tagging_args.add_argument("-f", "--file", type=Path, help="Path to the file to tag interactively")
     args = parser.parse_args()
 
     if args.initialize:
