@@ -49,6 +49,10 @@ def tag_all(engine):
 
 
 def tag_file(engine, file_to_tag, only_uninitialized_categories):
+    if len(engine.get_categories()) == 0:
+        print("Database doesn't contain any categories.")
+        return
+
     print(f"Tagging file {file_to_tag}")
     for category in engine.get_categories():
         available_values = engine.get_tags_for_category(category)
