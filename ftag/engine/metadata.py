@@ -29,13 +29,16 @@ class TagEngineMetadata:
         with open(metadata_file_path, "r") as file:
             self._metadata = json.load(file)
 
+        def raiseException(msg):
+            raise TagEngineException(f"Metadata seems to be incorrect. {msg}")
+
         # Simple basic validation
         if "filters" not in self._metadata:
-            return False
+            raiseException('Field "filters" does not exist.')
         if "files" not in self._metadata:
-            return False
+            raiseException('Field "files" does not exist.')
         if "tags" not in self._metadata:
-            return False
+            raiseException('Field "tags" does not exist.')
 
     def save(self, metadata_file_path, tmp_file):
         with open(tmp_file, "w") as file:
