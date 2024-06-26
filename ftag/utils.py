@@ -47,7 +47,7 @@ def join_selected_tags_names(tags, available_tags):
     if len(tags) == 0:
         return "<EMPTY>"
 
-    indices = [str(available_tags.index(x)) for x in tags]
+    indices = [str(available_tags.index(x)) for x in tags if x in available_tags]
 
     indices_str = " ".join(indices)
     tags_str = ", ".join(tags)
@@ -93,7 +93,7 @@ def read_indices(previous_tags, available_tags, max_index):
         if use_previous:
             if previous_tags is None:
                 raise CliException('Cannot use a "-" argument - tags are uninitialized')
-            result = [available_tags.index(x) for x in previous_tags]
+            result = [available_tags.index(x) for x in previous_tags if x in available_tags]
         else:
             result = []
 
