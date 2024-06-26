@@ -127,7 +127,9 @@ class TagEngine:
         try:
             file_tags = self._metadata.get_tags_for_file(file_path, None)
         except TagEngineException as e:
+            file_tags = None
             print(e.message)
+        if file_tags is None:
             return
 
         # Iterate over all tags assigned to this file and generate symlinks for each one.
@@ -136,11 +138,11 @@ class TagEngine:
                 symlink_dir = f"{self._get_symlink_root()}/{category}/{value}"
                 symlink(file_path, symlink_dir, file_hash)
 
-    def add_category(self, category_name):
-        self._metadata.add_category(category_name)
+    def add_category(self, category):
+        self._metadata.add_category(category)
 
     def add_tag(self, category, new_tag):
-        self._metadata.add_tag(category_name)
+        self._metadata.add_tag(category, new_tag)
 
     def get_tags_for_file(self, file_path, category):
         if category is None:
@@ -148,4 +150,4 @@ class TagEngine:
         return self._metadata.get_tags_for_file(file_path, category)
 
     def set_tags(self, file_path, tags):
-        self._metadata.set_tags(file_path, tags)
+        self._metadata.set_tags(file_path, tags, self._get_root_dir_path())

@@ -31,9 +31,9 @@ def initialize_database():
         info(f"Successfully created new ftag database in {engine.get_metadata_file()}")
 
 
-def add_category(engine, category_name):
+def add_category(engine, category):
     try:
-        engine.add_category(category_name)
+        engine.add_category(category)
     except TagEngineException as e:
         error(e.message)
     engine.save()

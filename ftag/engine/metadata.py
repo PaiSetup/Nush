@@ -56,22 +56,22 @@ class TagEngineMetadata:
             raise TagEngineException(f"File {file_path} does not exist")
 
         if file_hash not in self._metadata["files"]:
-            raise TagEngineException(f"File {file_path} is not tagged")
+            return None
 
         tags = self._metadata["files"][file_hash]["tags"]
         if category is None:
             return tags
         else:
             if category not in tags:
-                raise TagEngineException(f"File {file_path} is not tagged for category {category}")
+                return None
             return tags[category]
 
-    def add_category(self, category_name):
-        if not re.match(name_regex, category_name):
-            raise TagEngineException(f'Category name "{category_name}" is not allowed.')
-        if category_name in self._metadata["tags"]:
-            raise TagEngineException(f'Category name "{category_name}" already exists.')
-        self._metadata["tags"][category_name] = []
+    def add_category(self, category):
+        if not re.match(name_regex, category):
+            raise TagEngineException(f'Category name "{category}" is not allowed.')
+        if category in self._metadata["tags"]:
+            raise TagEngineException(f'Category name "{category}" already exists.')
+        self._metadata["tags"][category] = []
 
     def add_tag(self, category, new_tag):
         if not re.match(name_regex, new_tag):
@@ -82,7 +82,7 @@ class TagEngineMetadata:
             raise TagEngineException(f'Tag "{new_tag}" already exists')
         self._metadata["tags"][category].append(new_tag)
 
-    def set_tags(self, file_path, tags):
+    def set_tags(self, file_path, tags, root_dir_path):
         file_hash = get_file_hash(file_path)
         if file_hash is None:
             raise TagEngineException(f"File {file_path} does not exist")
@@ -91,7 +91,7 @@ class TagEngineMetadata:
         # is constant. Hash is unique identifier. Path is only for sanity checks, but it's not used.
         if file_hash not in self._metadata["files"]:
             self._metadata["files"][file_hash] = {
-                "path": str(file.absolute().relative_to(self._get_root_dir_path())),
+                "path": str(file_path.absolute().relative_to(root_dir_path)),
                 "tags": {},
             }
 
