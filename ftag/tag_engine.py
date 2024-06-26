@@ -2,6 +2,7 @@ import enum
 import hashlib
 import json
 import os
+import random
 import re
 import shutil
 from pathlib import Path
@@ -107,7 +108,7 @@ class TagEngine:
                     continue
                 yield file_path
 
-    def get_untagged_files(self):
+    def get_untagged_files(self, randomize=True):
         def is_untagged(file_path, categories):
             file_hash = TagEngine._get_file_hash(file_path)
             if file_hash not in self._metadata["files"]:
@@ -117,7 +118,11 @@ class TagEngine:
             return any((c not in file_tags for c in categories))
 
         categories = self.get_tag_categories()
-        return (f for f in self._get_taggable_files() if is_untagged(f, categories))
+        files = self._get_taggable_files()
+        if randomize:
+            files = list(files)
+            random.shuffle(files)
+        return (f for f in files if is_untagged(f, categories))
 
     def generate_all_files(self, cleanup):
         if cleanup:
