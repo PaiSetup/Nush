@@ -44,13 +44,13 @@ class TagEngineMetadata:
         file_tags = list(self._metadata["files"][file_hash]["tags"].keys())
         return any((c not in file_tags for c in categories))
 
-    def get_tag_categories(self):
+    def get_categories(self):
         return list(self._metadata["tags"].keys())
 
-    def get_tag_values(self, category):
+    def get_tags_for_category(self, category):
         return list(self._metadata["tags"][category])
 
-    def get_file_tags(self, file_path):
+    def get_tags_for_file(self, file_path, category):
         file_hash = get_file_hash(file_path)
         if file_hash is None:
             raise TagEngineException(f"File {file_path} does not exist")
@@ -58,13 +58,13 @@ class TagEngineMetadata:
         if file_hash not in self._metadata["files"]:
             raise TagEngineException(f"File {file_path} is not tagged")
 
-        return self._metadata["files"][file_hash]["tags"]
-
-    def get_tags_for_file(self, file_path, category):
-        tags = self.get_file_tags(file_path)
-        if category not in tags:
-            raise TagEngineException(f"File {file_path} is not tagged for category {category}")
-        return tags[category]
+        tags = self._metadata["files"][file_hash]["tags"]
+        if category is None:
+            return tags
+        else:
+            if category not in tags:
+                raise TagEngineException(f"File {file_path} is not tagged for category {category}")
+            return tags[category]
 
     def add_category(self, category_name):
         if not re.match(name_regex, category_name):

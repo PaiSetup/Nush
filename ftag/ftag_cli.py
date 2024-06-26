@@ -40,7 +40,7 @@ def add_category(engine, category_name):
 
 
 def generate(engine):
-    engine.generate_all_files(True)
+    engine.generate_all_symlinks(True)
 
 
 def tag_all(engine):
@@ -50,15 +50,15 @@ def tag_all(engine):
 
 def tag_file(engine, file_to_tag, only_uninitialized_categories):
     print(f"Tagging file {file_to_tag}")
-    for category in engine.get_tag_categories():
-        available_values = engine.get_tag_values(category)
+    for category in engine.get_categories():
+        available_values = engine.get_tags_for_category(category)
         current_values = engine.get_tags_for_file(file_to_tag, category)
         print(f"  {category}: {join_selected_tags_names(current_values, available_values)}")
     print()
 
     # Select tag values for each available tag category
     tags = {}
-    for category in engine.get_tag_categories():
+    for category in engine.get_categories():
         current_values = engine.get_tags_for_file(file_to_tag, category)
         if only_uninitialized_categories and current_values is not None:
             tags[category] = current_values
@@ -66,7 +66,7 @@ def tag_file(engine, file_to_tag, only_uninitialized_categories):
 
         # Display values for this category
         print(f"CATEGORY {category}:")
-        available_values = engine.get_tag_values(category)
+        available_values = engine.get_tags_for_category(category)
         new_index = len(available_values)
         for index, value in enumerate(available_values):
             print(f"  {index: >2}: {value}")
@@ -90,7 +90,7 @@ def tag_file(engine, file_to_tag, only_uninitialized_categories):
                     warning(e.message)
                     warning(f'Could not add value "{new_value}" to category {category}.')
                     continue
-                available_values = engine.get_tag_values(category)
+                available_values = engine.get_tags_for_category(category)
 
             # Use the indices to search through available values.
             values = [available_values[index] for index in indices]
@@ -102,7 +102,7 @@ def tag_file(engine, file_to_tag, only_uninitialized_categories):
 
     engine.set_tags(file_to_tag, tags)
     engine.save()
-    engine.generate_file(file_to_tag)
+    engine.generate_symlink(file_to_tag)
 
 
 # ------------------------------------- Main procedure

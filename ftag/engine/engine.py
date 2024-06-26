@@ -66,11 +66,11 @@ class TagEngine:
     def get_metadata_file(self):
         return self._root_dir / metadata_file_name
 
-    def get_tag_categories(self):
-        return self._metadata.get_tag_categories()
+    def get_categories(self):
+        return self._metadata.get_categories()
 
-    def get_tag_values(self, category):
-        return self._metadata.get_tag_values(category)
+    def get_tags_for_category(self, category):
+        return self._metadata.get_tags_for_category(category)
 
     def save(self):
         real_file = self.get_metadata_file()
@@ -88,23 +88,23 @@ class TagEngine:
                 yield file_path
 
     def get_untagged_files(self, randomize=True):
-        categories = self._metadata.get_tag_categories()
+        categories = self._metadata.get_categories()
         files = self._get_taggable_files()
         if randomize:
             files = list(files)
             random.shuffle(files)
         return (f for f in files if self._metadata.is_untagged(f, categories))
 
-    def generate_all_files(self, cleanup):
+    def generate_all_symlinks(self, cleanup):
         if cleanup:
             symlink_root = self._get_symlink_root()
             if symlink_root.exists():
                 shutil.rmtree(symlink_root)
 
         for file_path in self._get_taggable_files():
-            self.generate_file(file_path)
+            self.generate_symlink(file_path)
 
-    def generate_file(self, file_path):
+    def generate_symlink(self, file_path):
         # Define a helper function for generating a symlink.
         def symlink(real_file_path, symlink_dir, file_hash):
             real_file_path = Path(real_file_path).absolute()
@@ -125,7 +125,7 @@ class TagEngine:
 
         # Get tags of the file as a dictionary - key is category name, value is list of tags
         try:
-            file_tags = self._metadata.get_file_tags(file_path)
+            file_tags = self._metadata.get_tags_for_file(file_path, None)
         except TagEngineException as e:
             print(e.message)
             return
@@ -143,6 +143,8 @@ class TagEngine:
         self._metadata.add_tag(category_name)
 
     def get_tags_for_file(self, file_path, category):
+        if category is None:
+            raise TagEngineException("Category must be specified")
         return self._metadata.get_tags_for_file(file_path, category)
 
     def set_tags(self, file_path, tags):
