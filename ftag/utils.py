@@ -1,5 +1,7 @@
 import os
+import platform
 import re
+import subprocess
 import sys
 
 
@@ -158,6 +160,26 @@ def read_tag():
         return line
 
     return run_cli_operation(operation)
+
+
+class BackgroundProcess:
+    def __init__(self, args):
+        self._handle = subprocess.Popen(
+            args,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
+        )
+
+    def open_file_in_default_application(file_path):
+        os = platform.system()
+        if os == "Linux":
+            return BackgroundProcess(["xdg-open", file_path])
+        else:
+            raise NotImplementedError()  # TODO Windows
+
+    def kill(self):
+        # TODO kill children recursively. In case of xdg-open this doesn't do anything.
+        self._handle.kill()
 
 
 def info(*args, **kwargs):
