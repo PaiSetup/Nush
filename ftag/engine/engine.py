@@ -94,7 +94,6 @@ class TagEngine:
                 file_path = Path(os.path.abspath(os.path.join(root, file_name)))
                 if file_path.is_relative_to(self._get_symlink_root()):
                     continue
-                file_path = file_path.absolute().relative_to(self._get_root_dir_path())
 
                 yield file_path
 
@@ -117,8 +116,8 @@ class TagEngine:
         if len(path_filters) == 0:
             return True
 
+        file_path = str(file_path.absolute().relative_to(self._get_root_dir_path()))
         for path_filter in path_filters:
-            file_path = str(file_path)
             if re.search(path_filter, str(file_path)):
                 return True
         return False
