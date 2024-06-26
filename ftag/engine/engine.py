@@ -9,9 +9,10 @@ from engine.exception import TagEngineException
 from engine.metadata import TagEngineMetadata
 from engine.misc import get_file_hash, get_file_mime_type
 
+metadata_directory_name = ".ftag"
 tagged_directory_name = "ftags"
-metadata_file_name = "ftags.json"
-metadata_file_name_tmp = "ftags_tmp.json"
+metadata_file_name = "db.json"
+metadata_file_name_tmp = "db_tmp.json"
 
 
 class TagEngineState(enum.Enum):
@@ -47,7 +48,7 @@ class TagEngine:
         previous_path = None
         current_path = Path(os.path.abspath(os.curdir))
         while current_path != previous_path:
-            ftags_path = current_path / metadata_file_name
+            ftags_path = current_path / metadata_directory_name / metadata_file_name
             if ftags_path.is_file():
                 return current_path
 
@@ -64,8 +65,14 @@ class TagEngine:
     def get_state(self):
         return self._state
 
+    def _get_metadata_dir_path(self):
+        return self._root_dir / metadata_directory_name
+
     def get_metadata_file(self):
-        return self._root_dir / metadata_file_name
+        return self._root_dir / metadata_directory_name / metadata_file_name
+
+    def _get_metadata_tmp_file(self):
+        return self._root_dir / metadata_directory_name / metadata_file_name_tmp
 
     def get_categories(self):
         return self._metadata.get_categories()
@@ -75,13 +82,13 @@ class TagEngine:
 
     def save(self):
         real_file = self.get_metadata_file()
-        tmp_file = self._get_root_dir_path() / metadata_file_name_tmp
+        tmp_file = self._get_metadata_tmp_file()
         self._metadata.save(real_file, tmp_file)
 
     def _get_taggable_files(self):
         for root, dirs, files in os.walk(self._get_root_dir_path()):
             for file_name in files:
-                if file_name == metadata_file_name:
+                if Path(root) == self._get_metadata_dir_path():
                     continue
 
                 file_path = Path(os.path.abspath(os.path.join(root, file_name)))

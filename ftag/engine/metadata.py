@@ -41,6 +41,7 @@ class TagEngineMetadata:
             raiseException('Field "tags" does not exist.')
 
     def save(self, metadata_file_path, tmp_file):
+        metadata_file_path.parent.mkdir(exist_ok=True, parents=False)
         with open(tmp_file, "w") as file:
             content = json.dump(self._metadata, file, indent=4)
         shutil.move(tmp_file, metadata_file_path)
