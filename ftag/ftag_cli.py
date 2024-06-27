@@ -23,6 +23,7 @@ def initialize_database():
     if engine.get_state() != TagEngineState.NotLoaded:
         error(f"Ftag database is already created: {engine.get_metadata_file()}")
     engine.initialize()
+    engine.save()
 
     engine = TagEngine()
     if engine.get_state() != TagEngineState.Loaded:
@@ -46,6 +47,27 @@ def add_mime_filter(engine, new_filter):
 
 def add_path_filter(engine, new_filter):
     engine.add_path_filter(new_filter)
+    engine.save()
+
+
+def create_query(engine):
+    # Read rules
+    rules = {}
+    for category in engine.get_categories():
+        # Display available tags for this category
+        available_values = engine.get_tags_for_category(category)
+        for index, value in enumerate(available_values):
+            print(f"  {index: >2}: {value}")
+
+        # Read user selection and add it to the query rules
+        indices = read_indices(None, available_values, len(available_values))
+        if indices:
+            rules[category] = [available_values[index] for index in indices]
+
+    # Read query name
+    query_name = read_identifier("query name")
+
+    engine.add_query(query_name, rules)
     engine.save()
 
 
@@ -99,7 +121,7 @@ def tag_file(engine, file_to_tag, only_uninitialized_categories):
                 # If user selected special NEW index, then try to add a new value to
                 # current category. If could not add (i.e. index already present) then
                 # ignore it.
-                new_value = read_tag()
+                new_value = read_identifier("new tag value")
                 try:
                     tag_added = engine.add_tag(category, new_value)
                 except TagEngineException as e:
@@ -131,6 +153,7 @@ if __name__ == "__main__":
     config_args.add_argument("-c", "--add_category", type=str, help="Add a new category to the ftag database.")
     config_args.add_argument("-m", "--add_mime_filter", type=str, help=f"Add a new mime filter as a regex checked against mime type. {filters_help}")
     config_args.add_argument("-p", "--add_path_filter", type=str, help=f"Add a new path filter as a regex checked against file path. {filters_help}")
+    config_args.add_argument("-q", "--create_query", action="store_true", help=f"Creates a new query.")
     tagging_args = parser.add_argument_group("File operations")
     tagging_args.add_argument("-g", "--generate", action="store_true", help="Generate symlinks")
     tagging_args.add_argument("-t", "--tag_all", action="store_true", help="Iterate over all untagged files and tag them.")
@@ -148,6 +171,9 @@ if __name__ == "__main__":
     elif args.add_path_filter:
         engine = load_engine()
         add_path_filter(engine, args.add_path_filter)
+    elif args.create_query:
+        engine = load_engine()
+        create_query(engine)
     elif args.generate:
         engine = load_engine()
         generate(engine)

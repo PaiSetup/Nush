@@ -40,7 +40,6 @@ class TagEngine:
     def initialize(self):
         self._root_dir = Path(os.path.abspath(os.curdir))
         self._metadata = TagEngineMetadata(None)
-        self.save()
         self._state = TagEngineState.Loaded
 
     @staticmethod
@@ -144,9 +143,18 @@ class TagEngine:
         for file_path in self._get_taggable_files():
             self._generate_symlinks(file_path)
 
+        for query_name in self._metadata.get_query_names():
+            self._generate_symlinks_for_query(query_name)
+
     def _get_symlink_path(self, category, value, file_path):
         file_hash = get_file_hash(file_path)
         symlink_dir = self._get_symlink_root() / category / value
+        symlink_name = f"{file_hash}{file_path.suffix}"
+        return symlink_dir / symlink_name
+
+    def _get_query_symlink_path(self, query_name, file_path):
+        file_hash = get_file_hash(file_path)
+        symlink_dir = self._get_symlink_root() / "queries" / query_name
         symlink_name = f"{file_hash}{file_path.suffix}"
         return symlink_dir / symlink_name
 
@@ -166,7 +174,15 @@ class TagEngine:
                 symlink_path = self._get_symlink_path(category, value, file_path)
                 symlink_path.unlink(missing_ok=True)
 
+        # Iterate over all queries and remove symlinks for matching ones.
+        for category, values in file_tags.items():
+            for value in values:
+                symlink_path = self._get_symlink_path(category, value, file_path)
+                symlink_path.unlink(missing_ok=True)
+
     def _generate_symlinks(self, file_path):
+        file_path_absolute = file_path.absolute()
+
         # Get tags of the file as a dictionary - key is category name, value is list of tags
         try:
             file_tags = self._metadata.get_tags_for_file(file_path, None)
@@ -176,14 +192,31 @@ class TagEngine:
         if file_tags is None:
             return
 
+        # Helper function for creating a symlink
+        def generate_symlink(symlink_path):
+            symlink_path.parent.mkdir(parents=True, exist_ok=True)
+            symlink_path.unlink(missing_ok=True)
+            os.symlink(file_path_absolute, symlink_path)
+
         # Iterate over all tags assigned to this file and generate symlinks for each one.
-        file_path_absolute = file_path.absolute()
         for category, values in file_tags.items():
             for value in values:
                 symlink_path = self._get_symlink_path(category, value, file_path)
+                generate_symlink(symlink_path)
+
+        # Iterate over all queries and generate a symlink for queries matching this file.
+        for query_name in self._metadata.get_query_names():
+            if self._metadata.matches_query(query_name, file_path):
+                symlink_path = self._get_query_symlink_path(query_name, file_path)
+                generate_symlink(symlink_path)
+
+    def _generate_symlinks_for_query(self, query_name):
+        for file_path in self._get_taggable_files():
+            if self._metadata.matches_query(query_name, file_path):
+                symlink_path = self._get_query_symlink_path(query_name, file_path)
                 symlink_path.parent.mkdir(parents=True, exist_ok=True)
                 symlink_path.unlink(missing_ok=True)
-                os.symlink(file_path_absolute, symlink_path)
+                os.symlink(file_path, symlink_path)
 
     def add_category(self, category):
         self._metadata.add_category(category)
@@ -193,6 +226,10 @@ class TagEngine:
 
     def add_path_filter(self, new_filter):
         self._metadata.add_path_filter(new_filter)
+
+    def add_query(self, query_name, rules):
+        self._metadata.add_query(query_name, rules)
+        self._generate_symlinks_for_query(query_name)
 
     def add_tag(self, category, new_tag):
         self._metadata.add_tag(category, new_tag)

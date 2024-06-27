@@ -151,9 +151,9 @@ def read_yes_no(prompt, empty_lines_threshold=4):
     return run_cli_operation(operation)
 
 
-def read_tag():
+def read_identifier(name):
     def operation():
-        line = input("Input new tag value: ")
+        line = input(f"Input {name}: ")
         line = line.strip()
         if len(line) == 0:
             raise CliException(None)

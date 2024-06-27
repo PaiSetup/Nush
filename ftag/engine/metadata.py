@@ -25,6 +25,7 @@ class TagEngineMetadata:
             },
             "tags": {},
             "version": 0,
+            "queries": {},
         }
 
     def load(self, metadata_file_path):
@@ -33,13 +34,14 @@ class TagEngineMetadata:
 
         def require_field(field):
             if field not in self._metadata:
-                raise TagEngineException('Metadata seems to be incorrect. Field "filters" does not exist.')
+                raise TagEngineException(f'Metadata seems to be incorrect. Field "{field}" does not exist.')
 
         # Simple basic validation
         require_field("filters")
         require_field("files")
         require_field("tags")
         require_field("version")
+        require_field("queries")
 
     def save(self, metadata_file_path, tmp_file):
         self._metadata["version"] += 1
@@ -68,6 +70,9 @@ class TagEngineMetadata:
 
     def get_path_filters(self):
         return self._metadata["filters"]["path"]
+
+    def get_query_names(self):
+        return self._metadata["queries"]
 
     def get_categories(self):
         return list(self._metadata["tags"].keys())
@@ -106,6 +111,11 @@ class TagEngineMetadata:
         if new_filter not in self._metadata["filters"]["path"]:
             self._metadata["filters"]["path"].append(new_filter)
 
+    def add_query(self, query_name, rules):
+        if query_name in self._metadata["queries"]:
+            raise TagEngineException(f'Query "{query_name}" already exists')
+        self._metadata["queries"][query_name] = rules
+
     def add_tag(self, category, new_tag):
         if not re.match(name_regex, new_tag):
             raise TagEngineException(f'Tag name "{new_tag}" is not allowed.')
@@ -130,3 +140,23 @@ class TagEngineMetadata:
 
         # Entry must be created by now. Set the tags
         self._metadata["files"][file_hash]["tags"] = dict(tags)
+
+    def matches_query(self, query_name, file_path):
+        if query_name not in self._metadata["queries"]:
+            raise TagEngineException(f"Query {query_name} does not exist")
+        query_rules = self._metadata["queries"][query_name]
+        tags = self.get_tags_for_file(file_path, None)
+
+        if not tags:
+            return False
+
+        # All categories in the query rules must be matched.
+        for category, required_values in query_rules.items():
+            if category not in tags:
+                return False
+
+            for required_value in required_values:
+                if required_value not in tags[category]:
+                    return False
+
+        return True
