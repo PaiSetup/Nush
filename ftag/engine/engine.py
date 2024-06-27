@@ -2,12 +2,12 @@ import enum
 import os
 import random
 import re
-import shutil
 from pathlib import Path
 
 from engine.exception import TagEngineException
 from engine.metadata import TagEngineMetadata
 from engine.misc import get_file_hash, get_file_mime_type
+from engine.symlinker import Symlinker
 
 metadata_directory_name = ".ftag"
 tagged_directory_name = "ftags"
@@ -36,10 +36,12 @@ class TagEngine:
                 self._state = TagEngineState.Loaded
         else:
             self._state = TagEngineState.NotLoaded
+        self._symlinker = Symlinker(self._root_dir / tagged_directory_name)
 
     def initialize(self):
         self._root_dir = Path(os.path.abspath(os.curdir))
         self._metadata = TagEngineMetadata(None)
+        self._symlinker = Symlinker(self._root_dir / tagged_directory_name)
         self._state = TagEngineState.Loaded
 
     @staticmethod
@@ -57,9 +59,6 @@ class TagEngine:
 
     def _get_root_dir_path(self):
         return self._root_dir
-
-    def _get_symlink_root(self):
-        return self._root_dir / tagged_directory_name
 
     def get_state(self):
         return self._state
@@ -91,7 +90,7 @@ class TagEngine:
                     continue
 
                 file_path = Path(os.path.abspath(os.path.join(root, file_name)))
-                if file_path.is_relative_to(self._get_symlink_root()):
+                if file_path.is_relative_to(self._symlinker.get_root()):
                     continue
 
                 yield file_path
@@ -121,6 +120,18 @@ class TagEngine:
                 return True
         return False
 
+    def _setup_symlinks_for_file(self, file_path, create):
+        try:
+            file_tags = self._metadata.get_tags_for_file(file_path, None)
+        except TagEngineException as e:
+            file_tags = None
+            print(e.message)
+        if file_tags is None:
+            return
+
+        queries = (query for query in self._metadata.get_query_names() if self._metadata.matches_query(query, file_path))
+        self._symlinker.setup_symlinks_for_file(file_path, file_tags, queries, create)
+
     def get_untagged_files(self, randomize=True):
         categories = self._metadata.get_categories()
         files = self._get_taggable_files()
@@ -134,90 +145,6 @@ class TagEngine:
         files = (f for f in files if self._matches_mime_filters(f))
         return files
 
-    def generate_all_symlinks(self, cleanup):
-        if cleanup:
-            symlink_root = self._get_symlink_root()
-            if symlink_root.exists():
-                shutil.rmtree(symlink_root)
-
-        for file_path in self._get_taggable_files():
-            self._generate_symlinks(file_path)
-
-        for query_name in self._metadata.get_query_names():
-            self._generate_symlinks_for_query(query_name)
-
-    def _get_symlink_path(self, category, value, file_path):
-        file_hash = get_file_hash(file_path)
-        symlink_dir = self._get_symlink_root() / category / value
-        symlink_name = f"{file_hash}{file_path.suffix}"
-        return symlink_dir / symlink_name
-
-    def _get_query_symlink_path(self, query_name, file_path):
-        file_hash = get_file_hash(file_path)
-        symlink_dir = self._get_symlink_root() / "queries" / query_name
-        symlink_name = f"{file_hash}{file_path.suffix}"
-        return symlink_dir / symlink_name
-
-    def _remove_symlinks(self, file_path):
-        # Get tags of the file as a dictionary - key is category name, value is list of tags
-        try:
-            file_tags = self._metadata.get_tags_for_file(file_path, None)
-        except TagEngineException as e:
-            file_tags = None
-            print(e.message)
-        if file_tags is None:
-            return
-
-        # Iterate over all tags assigned to this file and remove its symlinks
-        for category, values in file_tags.items():
-            for value in values:
-                symlink_path = self._get_symlink_path(category, value, file_path)
-                symlink_path.unlink(missing_ok=True)
-
-        # Iterate over all queries and remove symlinks for matching ones.
-        for category, values in file_tags.items():
-            for value in values:
-                symlink_path = self._get_symlink_path(category, value, file_path)
-                symlink_path.unlink(missing_ok=True)
-
-    def _generate_symlinks(self, file_path):
-        file_path_absolute = file_path.absolute()
-
-        # Get tags of the file as a dictionary - key is category name, value is list of tags
-        try:
-            file_tags = self._metadata.get_tags_for_file(file_path, None)
-        except TagEngineException as e:
-            file_tags = None
-            print(e.message)
-        if file_tags is None:
-            return
-
-        # Helper function for creating a symlink
-        def generate_symlink(symlink_path):
-            symlink_path.parent.mkdir(parents=True, exist_ok=True)
-            symlink_path.unlink(missing_ok=True)
-            os.symlink(file_path_absolute, symlink_path)
-
-        # Iterate over all tags assigned to this file and generate symlinks for each one.
-        for category, values in file_tags.items():
-            for value in values:
-                symlink_path = self._get_symlink_path(category, value, file_path)
-                generate_symlink(symlink_path)
-
-        # Iterate over all queries and generate a symlink for queries matching this file.
-        for query_name in self._metadata.get_query_names():
-            if self._metadata.matches_query(query_name, file_path):
-                symlink_path = self._get_query_symlink_path(query_name, file_path)
-                generate_symlink(symlink_path)
-
-    def _generate_symlinks_for_query(self, query_name):
-        for file_path in self._get_taggable_files():
-            if self._metadata.matches_query(query_name, file_path):
-                symlink_path = self._get_query_symlink_path(query_name, file_path)
-                symlink_path.parent.mkdir(parents=True, exist_ok=True)
-                symlink_path.unlink(missing_ok=True)
-                os.symlink(file_path, symlink_path)
-
     def add_category(self, category):
         self._metadata.add_category(category)
 
@@ -229,7 +156,9 @@ class TagEngine:
 
     def add_query(self, query_name, rules):
         self._metadata.add_query(query_name, rules)
-        self._generate_symlinks_for_query(query_name)
+
+        matching_files = (file for file in self._get_taggable_files() if self._metadata.matches_query(query_name, file))
+        self._symlinker.setup_symlinks_for_query(query_name, matching_files, True)
 
     def add_tag(self, category, new_tag):
         self._metadata.add_tag(category, new_tag)
@@ -240,6 +169,12 @@ class TagEngine:
         return self._metadata.get_tags_for_file(file_path, category)
 
     def set_tags(self, file_path, tags):
-        self._remove_symlinks(file_path)
+        self._setup_symlinks_for_file(file_path, False)
         self._metadata.set_tags(file_path, tags, self._get_root_dir_path())
-        self._generate_symlinks(file_path)
+        self._setup_symlinks_for_file(file_path, True)
+
+    def generate_all_symlinks(self):
+        self._symlinker.cleanup()
+
+        for file_path in self._get_taggable_files():
+            self._setup_symlinks_for_file(file_path, True)

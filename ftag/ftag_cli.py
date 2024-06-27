@@ -72,7 +72,7 @@ def create_query(engine):
 
 
 def generate(engine):
-    engine.generate_all_symlinks(True)
+    engine.generate_all_symlinks()
 
 
 def tag_all(engine):
