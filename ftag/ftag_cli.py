@@ -79,6 +79,8 @@ def tag_all(engine):
     for file_to_tag in engine.get_untagged_files():
         default_app = BackgroundProcess.open_file_in_default_application(file_to_tag)
         tag_file(engine, file_to_tag, True)
+        while not read_yes_no("Do you want tag a next file? Say 'no' to re-tag this one."):
+            tag_file(engine, file_to_tag, False)
         default_app.kill()
 
 
