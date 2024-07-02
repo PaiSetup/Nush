@@ -130,9 +130,9 @@ def read_indices(previous_tags, available_tags, max_index):
 
 
 def read_yes_no(prompt, empty_lines_threshold=4):
-    empty_lines_count = 0
+    empty_lines_count = [0]  # Use a list, so it is passed by reference
 
-    def operation():
+    def operation(empty_lines_count):
         line = input(f"{prompt} (y/n): ")
         if line == "y":
             return True
@@ -140,15 +140,15 @@ def read_yes_no(prompt, empty_lines_threshold=4):
             return False
 
         if len(line) == 0:
-            empty_lines_count += 1
-            if empty_lines_count == empty_lines_threshold:
+            empty_lines_count[0] += 1
+            if empty_lines_count[0] == empty_lines_threshold:
                 return True
         else:
-            empty_lines_count = 0
+            empty_lines_count[0] = 0
 
         raise CliException(None)
 
-    return run_cli_operation(operation)
+    return run_cli_operation(operation, empty_lines_count)
 
 
 def read_identifier(name):
