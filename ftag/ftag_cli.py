@@ -76,6 +76,9 @@ def generate(engine):
 
 
 def tag_all(engine):
+    statistics = engine.get_untagged_files_statistics()
+    print(f"Tagging {statistics['num_untagged_files']} out of {statistics['num_taggable_files']} taggable files.")
+
     for file_to_tag in engine.get_untagged_files():
         default_app = BackgroundProcess.open_file_in_default_application(file_to_tag)
         tag_file(engine, file_to_tag, True)

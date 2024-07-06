@@ -93,6 +93,12 @@ class TagEngine:
                 if file_path.is_relative_to(self._symlinker.get_root()):
                     continue
 
+                if not self._matches_path_filters(file_path):
+                    continue
+
+                if not self._matches_mime_filters(file_path):
+                    continue
+
                 yield file_path
 
     def _matches_mime_filters(self, file_path):
@@ -132,6 +138,15 @@ class TagEngine:
         queries = (query for query in self._metadata.get_query_names() if self._metadata.matches_query(query, file_path))
         self._symlinker.setup_symlinks_for_file(file_path, file_tags, queries, create)
 
+    def get_untagged_files_statistics(self):
+        categories = self._metadata.get_categories()
+        taggable_files = list(self._get_taggable_files())
+        untagged_files = [f for f in taggable_files if self._metadata.is_untagged(f, categories)]
+        return {
+            "num_taggable_files": len(taggable_files),
+            "num_untagged_files": len(untagged_files),
+        }
+
     def get_untagged_files(self, randomize=True):
         categories = self._metadata.get_categories()
         files = self._get_taggable_files()
@@ -141,8 +156,6 @@ class TagEngine:
             random.shuffle(files)
 
         files = (f for f in files if self._metadata.is_untagged(f, categories))
-        files = (f for f in files if self._matches_path_filters(f))
-        files = (f for f in files if self._matches_mime_filters(f))
         return files
 
     def add_category(self, category):
