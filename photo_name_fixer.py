@@ -21,9 +21,10 @@ match_sep2 = r"[_ ]"
 
 
 class NameFixer:
-    def __init__(self, allow_metadata, timezone):
+    def __init__(self, allow_metadata, timezone, time_shift_hours):
         self._prefixes = r"IMG-|IMG_|VID_|VideoCapture_"
         self._suffixes = r"_HDR|-WA[0-9]+|_TIMEBURST[0-9]+|_[0-9]+|~[0-9]+| ?\([0-9]+\)"
+        self.time_shift_hours = time_shift_hours
         self.disassemble_functions = [
             self.disassemble_yymmdd_hhmmss,
             self.disassemble_yymmdd_wa,
@@ -36,21 +37,21 @@ class NameFixer:
     def fix(self, name):
         path = Path(name)
 
-        disassembly_comment, tokens = self.disassemble(path)
-        if tokens is None:
+        disassembly_comment, date = self.disassemble(path)
+        if date is None:
             return (None, None)
         else:
-            return (disassembly_comment, self.assemble(path.parent, tokens, path.suffix))
+            return (disassembly_comment, self.assemble(path.parent, date, path.suffix))
 
-    def assemble(self, dir, tokens, extension):
-        (year, month, day, hour, minute, second) = tokens
-        return Path(dir, f"{year:04}{month:02}{day:02}_{hour:02}{minute:02}{second:02}{extension}")
+    def assemble(self, dir, date, extension):
+        return Path(dir, f"{date.year:04}{date.month:02}{date.day:02}_{date.hour:02}{date.minute:02}{date.second:02}{extension}")
 
     def disassemble(self, path):
         for fn in self.disassemble_functions:
-            result = fn(path)
-            if result is not None:
-                return (fn.__name__, result)
+            date = fn(path)
+            if date is not None:
+                date += datetime.timedelta(hours=self.time_shift_hours)
+                return (fn.__name__, date)
         return (None, None)
 
     def disassemble_yymmdd_hhmmss(self, path):
@@ -69,22 +70,14 @@ class NameFixer:
             return None
 
         result = result.groups()
-        result = result[1:4] + result[4:7]
-        return result
-
-    def disassemble_yymmdd_hhmmss_hyphens_space(self, path):
-        """
-        Takes names in format "YYYY-MM-DD HH-MM-SS", such as "2024-08-24 19-31-14". Date and hour tokens can be extracted directly from name.
-        """
-        result = re.search(
-            f"^({self._prefixes})?({match_year})-({match_month})-({match_day}) ({match_hour})({match_minute})({match_second})({match_millisecond})?($|{self._suffixes})",
-            path.stem,
+        return datetime.datetime(
+            year=int(result[1]),
+            month=int(result[2]),
+            day=int(result[3]),
+            hour=int(result[4]),
+            minute=int(result[5]),
+            second=int(result[6]),
         )
-        if result is None:
-            return None
-        result = result.groups()
-        result = result[1:4] + result[5:8]
-        return result
 
     def disassemble_yymmdd_wa(self, path):
         """
@@ -104,8 +97,14 @@ class NameFixer:
             int(result[4]) // 60 % 60,
             int(result[4]) % 60,
         )
-        result = result[1:4] + time
-        return result
+        return datetime.datetime(
+            year=int(result[1]),
+            month=int(result[2]),
+            day=int(result[3]),
+            hour=time[0],
+            minute=time[1],
+            second=time[2],
+        )
 
     def disassemble_yymmdd(self, path):
         """
@@ -119,8 +118,11 @@ class NameFixer:
         if result is None:
             return None
         result = result.groups()
-        result = result[1:4] + (0, 0, 0)
-        return result
+        return datetime.datetime(
+            year=int(result[1]),
+            month=int(result[2]),
+            day=int(result[3]),
+        )
 
     def disassembly_from_metadata(self, path):
         """
@@ -148,11 +150,20 @@ class NameFixer:
         stat = path.stat()
         unix_timestamp = min(stat.st_ctime, stat.st_mtime, stat.st_atime)
 
-        # Convert to tuple
+        # Extract date
         date = datetime.datetime.fromtimestamp(unix_timestamp, self.timezone)
         date_str = date.strftime("%Y-%m-%d-%H-%M-%S")
-        date_tokens = tuple(date_str.split("-"))
-        return date_tokens
+
+        # Return datetime object
+        date_tokens = date_str.split("-")
+        return datetime.datetime(
+            year=int(date_tokens[0]),
+            month=int(date_tokens[1]),
+            day=int(date_tokens[2]),
+            hour=int(date_tokens[3]),
+            minute=int(date_tokens[4]),
+            second=int(date_tokens[5]),
+        )
 
 
 class RenameMap:
@@ -260,6 +271,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("-i", "--renameinplace", action="store_true", help="Perform a rename operation on input files")
     arg_parser.add_argument("-m", "--allowmetadata", action="store_true", help="Allow looking at file metadata to find out the date. Not recommended. Requires --timezone.")
     arg_parser.add_argument("-t", "--timezone", type=str, help="Timezone used for extracting date from metadata.")
+    arg_parser.add_argument("-s", "--timeshift", type=int, default=0, help="Hour shift applied to all extracted dates.")
     args = arg_parser.parse_args()
     # fmt: on
 
@@ -269,6 +281,8 @@ if __name__ == "__main__":
         except:
             print("ERROR: specify a valid timezone when allowing metadata.")
             sys.exit(1)
+    else:
+        timezone = None
 
     # Verify directory with images
     for directory in args.directories:
@@ -277,7 +291,7 @@ if __name__ == "__main__":
             sys.exit(1)
 
     # Get files and prepare a rename map - a dictionary in which key is old filename and value is new filename
-    name_fixer = NameFixer(args.allowmetadata, timezone)
+    name_fixer = NameFixer(args.allowmetadata, timezone, args.timeshift)
     rename_map = RenameMap()
     files = get_files(args.directories)
     for file in files:
