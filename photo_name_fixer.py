@@ -1,25 +1,28 @@
 #!/bin/python
 
-import shutil
 import argparse
-import sys
-import re
-import os
 import datetime
+import os
+import re
+import shutil
+import sys
 from pathlib import Path
 
-match_year = "20[0-9]{2}"
-match_month = "0[0-9]|1[0-2]"
-match_day = "[0-2][0-9]|3[0-1]"
-match_hour = "[0-1][0-9]|2[0-4]"
-match_minute = "[0-5][0-9]"
+match_year = r"20[0-9]{2}"
+match_month = r"0[0-9]|1[0-2]"
+match_day = r"[0-2][0-9]|3[0-1]"
+match_hour = r"[0-1][0-9]|2[0-4]"
+match_minute = r"[0-5][0-9]"
 match_second = match_minute
+match_millisecond = r"[0-9][0-9][0-9]"
+match_sep1 = r"-?"
+match_sep2 = r"[_ ]"
 
 
 class NameFixer:
     def __init__(self, allow_metadata):
-        self._prefixes = "IMG-|IMG_|VID_|VideoCapture_"
-        self._suffixes = "_HDR|-WA[0-9]+|_TIMEBURST[0-9]+|_[0-9]+|~[0-9]+| ?\([0-9]+\)"
+        self._prefixes = r"IMG-|IMG_|VID_|VideoCapture_"
+        self._suffixes = r"_HDR|-WA[0-9]+|_TIMEBURST[0-9]+|_[0-9]+|~[0-9]+| ?\([0-9]+\)"
         self.disassemble_functions = [
             self.disassemble_yymmdd_hhmmss,
             self.disassemble_yymmdd_wa,
@@ -27,7 +30,6 @@ class NameFixer:
         ]
         if allow_metadata:
             self.disassemble_functions.append(self.disassembly_from_metadata)
-
 
     def fix(self, name):
         path = Path(name)
@@ -51,10 +53,29 @@ class NameFixer:
 
     def disassemble_yymmdd_hhmmss(self, path):
         """
-        Takes names in format YYYYMMDD_HHMMSS, such as "20220714_103015". Date and hour tokens can be extracted directly from name
+        Takes names in format YYYYMMDD_HHMMSS, such as "20220714_103015". Date and hour tokens can be extracted directly from name.
+        """
+        pattern = (
+            f"^({self._prefixes})?"
+            f"({match_year}){match_sep1}({match_month}){match_sep1}({match_day})"
+            f"{match_sep2}"
+            f"({match_hour}){match_sep1}({match_minute}){match_sep1}({match_second}){match_sep1}({match_millisecond})?"
+            f"($|{self._suffixes})"
+        )
+        result = re.search(pattern, path.stem)
+        if result is None:
+            return None
+
+        result = result.groups()
+        result = result[1:4] + result[4:7]
+        return result
+
+    def disassemble_yymmdd_hhmmss_hyphens_space(self, path):
+        """
+        Takes names in format "YYYY-MM-DD HH-MM-SS", such as "2024-08-24 19-31-14". Date and hour tokens can be extracted directly from name.
         """
         result = re.search(
-            f"^({self._prefixes})?({match_year})({match_month})({match_day})(_|-)({match_hour})({match_minute})({match_second})($|{self._suffixes})",
+            f"^({self._prefixes})?({match_year})-({match_month})-({match_day}) ({match_hour})({match_minute})({match_second})({match_millisecond})?($|{self._suffixes})",
             path.stem,
         )
         if result is None:
@@ -274,11 +295,10 @@ if __name__ == "__main__":
         print()
 
     # Perform actual purpose of the script
-    if not args.dryrun:
+    if args.dryrun:
+        print("Performing a dry run (no action done)")
+    else:
         if args.copyto:
             copy_files(rename_map, args.copyto)
-            sys.exit(0)
         elif args.renameinplace:
             rename_files(rename_map)
-            sys.exit(0)
-    print("Performing a dry run (no action done)")
