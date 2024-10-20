@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import sys
+import zoneinfo
 from pathlib import Path
 
 match_year = r"20[0-9]{2}"
@@ -20,7 +21,7 @@ match_sep2 = r"[_ ]"
 
 
 class NameFixer:
-    def __init__(self, allow_metadata):
+    def __init__(self, allow_metadata, timezone):
         self._prefixes = r"IMG-|IMG_|VID_|VideoCapture_"
         self._suffixes = r"_HDR|-WA[0-9]+|_TIMEBURST[0-9]+|_[0-9]+|~[0-9]+| ?\([0-9]+\)"
         self.disassemble_functions = [
@@ -29,6 +30,7 @@ class NameFixer:
             self.disassemble_yymmdd,
         ]
         if allow_metadata:
+            self.timezone = timezone
             self.disassemble_functions.append(self.disassembly_from_metadata)
 
     def fix(self, name):
@@ -131,7 +133,7 @@ class NameFixer:
         # Match our path to one of patterns
         patterns = [
             f"(IMG|VID)-{match_year}{match_month}{match_day}-WA[0-9]+",
-            "IMG_[0-9]+",
+            "IMG_[A-Z]?[0-9]+",
         ]
         patterns = [f"(^{x}$)" for x in patterns]
         pattern = "|".join(patterns)
@@ -147,11 +149,9 @@ class NameFixer:
         unix_timestamp = min(stat.st_ctime, stat.st_mtime, stat.st_atime)
 
         # Convert to tuple
-        date = datetime.datetime.utcfromtimestamp(unix_timestamp)
+        date = datetime.datetime.fromtimestamp(unix_timestamp, self.timezone)
         date_str = date.strftime("%Y-%m-%d-%H-%M-%S")
         date_tokens = tuple(date_str.split("-"))
-        # print(f"{type(unix_timestamp)}   {unix_timestamp} -> {date_tokens}")
-        return date_tokens
         return date_tokens
 
 
@@ -258,9 +258,17 @@ if __name__ == "__main__":
     arg_parser.add_argument("-d", "--directories", nargs='+', type=Path, required=True, help="Directories with photos")
     arg_parser.add_argument("-c", "--copyto", type=Path, help="Perform a copy operation to specified path")
     arg_parser.add_argument("-i", "--renameinplace", action="store_true", help="Perform a rename operation on input files")
-    arg_parser.add_argument("-m", "--allowmetadata", action="store_true", help="Allow looking at file metadata to find out the date. Not recommended.")
+    arg_parser.add_argument("-m", "--allowmetadata", action="store_true", help="Allow looking at file metadata to find out the date. Not recommended. Requires --timezone.")
+    arg_parser.add_argument("-t", "--timezone", type=str, help="Timezone used for extracting date from metadata.")
     args = arg_parser.parse_args()
     # fmt: on
+
+    if args.allowmetadata:
+        try:
+            timezone = zoneinfo.ZoneInfo(args.timezone)
+        except:
+            print("ERROR: specify a valid timezone when allowing metadata.")
+            sys.exit(1)
 
     # Verify directory with images
     for directory in args.directories:
@@ -269,7 +277,7 @@ if __name__ == "__main__":
             sys.exit(1)
 
     # Get files and prepare a rename map - a dictionary in which key is old filename and value is new filename
-    name_fixer = NameFixer(args.allowmetadata)
+    name_fixer = NameFixer(args.allowmetadata, timezone)
     rename_map = RenameMap()
     files = get_files(args.directories)
     for file in files:
