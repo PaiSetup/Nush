@@ -1,15 +1,15 @@
 #!/bin/python
 
-import shutil
 import argparse
-import sys
-import re
-import os
 import datetime
-from pathlib import Path
-import subprocess
-import shlex
 import multiprocessing
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
 
 class CommandError(Exception):
@@ -54,6 +54,17 @@ def downscale_file(root_dir, dst_dir, file, max_size):
     suffix = file.relative_to(root_dir)
     out_path = dst_dir / suffix
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    extension = path.suffix.lower()
+
+    # HEIC conversion
+    is_heic = extension == ".heic"
+    if is_heic:
+        tmp_path = out_path.with_suffix(".tmp.jpg")
+        command = f'heif-convert "{path}" "{tmp_path}"'
+        run_command(command)
+
+        path = tmp_path
+        out_path = out_path.with_suffix(".jpg")
 
     # Get filesize
     original_size = path.stat().st_size
@@ -65,8 +76,7 @@ def downscale_file(root_dir, dst_dir, file, max_size):
         return
 
     # Perform actual conversion
-    extension = path.suffix.lower()
-    if extension in [".png", ".jpg"]:
+    if extension in [".heic", ".png", ".jpg"]:
         factor = max_size / original_size
         factor = factor ** (1 / 2)
         factor = int(factor * 100) + 1
@@ -74,14 +84,18 @@ def downscale_file(root_dir, dst_dir, file, max_size):
         print(f"Image scaled down to {factor}%   ", end="")
         command = f'convert -resize {factor}% -quality 80% "{path}" "{out_path}"'
         run_command(command)
-    elif extension in [".mp4"]:
+    elif extension in [".mp4", ".mov"]:
         print("Video encoded with libx265 code with crf=28   ", end="")
-        command = f"ffmpeg -i {path}  -vcodec libx265 -crf 28 {out_path} -y"
+        command = f'ffmpeg -i "{path}" -vcodec libx265 -crf 28 "{out_path}" -y'
         run_command(command)
     else:
         print(" (UNKNOWN FORMAT) copying without changes")
         shutil.copyfile(path, out_path)
         return
+
+    #  Remove temporary file from HEIC conversion
+    if is_heic:
+        tmp_path.unlink()
 
     # Summarize
     new_size = out_path.stat().st_size
