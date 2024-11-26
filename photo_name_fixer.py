@@ -183,7 +183,6 @@ class RenameMap:
         for src, dst in self._map.items():
             if dst is None:
                 new_dst = None
-                continue
             else:
                 # Find directory's suffix. For example if:
                 #  - directory is /home/maciej/photos/
@@ -222,8 +221,12 @@ class RenameMap:
     def to_string(self, only_nones):
         result = ""
         result += "{\n"
-        max_src_length = max((len(x) for x in self._map.keys()))
-        max_dst_length = max((len(str(x)) for x in self._map.values()))
+        if self._map:
+            max_src_length = max((len(x) for x in self._map.keys()))
+            max_dst_length = max((len(str(x)) for x in self._map.values()))
+        else:
+            max_src_length = 1
+            max_dst_length = 1
         for src, dst in self._map.items():
             if not only_nones or str(dst).startswith("None"):
                 disassembly_comment = self._disassembly_info[src]
