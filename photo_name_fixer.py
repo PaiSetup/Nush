@@ -4,7 +4,9 @@ import argparse
 import datetime
 import os
 import re
+import shlex
 import shutil
+import subprocess
 import sys
 import zoneinfo
 from pathlib import Path
@@ -18,6 +20,36 @@ match_second = match_minute
 match_millisecond = r"[0-9][0-9][0-9]"
 match_sep1 = r"-?"
 match_sep2 = r"[_ ]"
+
+
+class CommandError(Exception):
+    def __init__(self, stdout, stderr):
+        self.stdout = stdout
+        self.stderr = stderr
+
+    def __str__(self):
+        print(f"stdout: {self.stdout}\n\nstderr: {self.stderr}")
+
+
+def run_command(command, *, stdin=subprocess.PIPE):
+    # Run command
+    command = shlex.split(command)
+    process = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    # Process output
+    (stdout_data, stderr_data) = process.communicate()
+    if stdout_data is not None:
+        stdout_data = stdout_data.decode("utf-8")
+    if stderr_data is not None:
+        stderr_data = stderr_data.decode("utf-8")
+
+    # Check return value
+    return_value = process.wait()
+    if return_value != 0:
+        raise CommandError(stdout_data, stderr_data)
+
+    # Return stdout
+    return stdout_data
 
 
 class NameFixer:
@@ -146,16 +178,24 @@ class NameFixer:
         if result is None:
             return None
 
-        # Get earliest timestamp that we have
-        stat = path.stat()
-        unix_timestamp = min(stat.st_ctime, stat.st_mtime, stat.st_atime)
-
-        # Extract date
-        date = datetime.datetime.fromtimestamp(unix_timestamp, self.timezone)
-        date_str = date.strftime("%Y-%m-%d-%H-%M-%S")
+        try:
+            # Try to extract from EXIF tags
+            # TODO should we use timezone here?
+            exif_result = run_command(f'exiv2 -g DateTimeOriginal/i "{path}"')
+            time_regex = rf" ({match_year}):({match_month}):({match_day}) ({match_hour}):({match_minute}):({match_second})"
+            regex_result = re.search(time_regex, exif_result)
+            if not regex_result:
+                raise ValueError()
+            date_tokens = regex_result.groups()
+        except:
+            # Fallback to unix timestamps. Get earliest timestamp that we have
+            stat = path.stat()
+            unix_timestamp = min(stat.st_ctime, stat.st_mtime, stat.st_atime)
+            date = datetime.datetime.fromtimestamp(unix_timestamp, self.timezone)
+            date_str = date.strftime("%Y-%m-%d-%H-%M-%S")
+            date_tokens = date_str.split("-")
 
         # Return datetime object
-        date_tokens = date_str.split("-")
         return datetime.datetime(
             year=int(date_tokens[0]),
             month=int(date_tokens[1]),
