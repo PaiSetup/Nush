@@ -13,9 +13,9 @@ class Symlinker:
         return self._symlink_root
 
     def _get_symlink_path(self, category, value, file_path):
-        file_hash = get_file_hash(file_path)
+        file_hash = get_file_hash(file_path)[:6]
         symlink_dir = self._symlink_root / category / value
-        symlink_name = f"{file_hash}{file_path.suffix}"
+        symlink_name = f"{file_path.stem}_{file_hash}{file_path.suffix}"
         return symlink_dir / symlink_name
 
     def _get_query_symlink_path(self, query_name, file_path):
@@ -40,8 +40,12 @@ class Symlinker:
             symlink_path.unlink(missing_ok=True)
 
     def cleanup(self):
-        if self._symlink_root.exists():
-            shutil.rmtree(self._symlink_root)
+        if not self._symlink_root.exists():
+            return
+
+        for file_path in self._symlink_root.rglob("*"):
+            if file_path.is_file() or file_path.is_symlink():
+                file_path.unlink()
 
     def setup_symlinks_for_query(self, query_name, matching_files, create):
         for file_path in matching_files:
