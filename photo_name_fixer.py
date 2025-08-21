@@ -20,6 +20,7 @@ match_second = match_minute
 match_millisecond = r"[0-9][0-9][0-9]"
 match_sep1 = r"-?"
 match_sep2 = r"[_ ]"
+match_sep2_optional = rf"{match_sep2}?"
 
 
 class CommandError(Exception):
@@ -53,14 +54,16 @@ def run_command(command, *, stdin=subprocess.PIPE):
 
 
 class NameFixer:
-    def __init__(self, allow_metadata, timezone, time_shift_hours):
-        self._prefixes = r"IMG-|IMG_|VID_|VideoCapture_"
+    def __init__(self, allow_metadata, timezone, time_shift_hours, time_shift_pxl_hours):
+        self._prefixes = r"IMG|IMG-|IMG_|VID_|VideoCapture_"
         self._suffixes = r"_HDR|-WA[0-9]+|_TIMEBURST[0-9]+|_[0-9]+|~[0-9]+| ?\([0-9]+\)"
         self.time_shift_hours = time_shift_hours
+        self.time_shift_pxl_hours = time_shift_pxl_hours
         self.disassemble_functions = [
             self.disassemble_yymmdd_hhmmss,
             self.disassemble_yymmdd_wa,
             self.disassemble_yymmdd,
+            self.disassemble_pxl_yymmdd_hhmmss,
         ]
         if allow_metadata:
             self.timezone = timezone
@@ -89,11 +92,12 @@ class NameFixer:
     def disassemble_yymmdd_hhmmss(self, path):
         """
         Takes names in format YYYYMMDD_HHMMSS, such as "20220714_103015". Date and hour tokens can be extracted directly from name.
+        It also accepts names without the underscore separator, so YYYYMMDDHHMMSS
         """
         pattern = (
             f"^({self._prefixes})?"
             f"({match_year}){match_sep1}({match_month}){match_sep1}({match_day})"
-            f"{match_sep2}"
+            f"{match_sep2_optional}"
             f"({match_hour}){match_sep1}({match_minute}){match_sep1}({match_second}){match_sep1}({match_millisecond})?"
             f"($|{self._suffixes})"
         )
@@ -113,8 +117,8 @@ class NameFixer:
 
     def disassemble_yymmdd_wa(self, path):
         """
-        Takes names in format YYYYMMDD with WA suffix, such as "20220714-WA0001". Date tokens can be extracted directly from name. Hour tokens cannot be
-        extracted and they are assigned made up values based on index after 'WA'.
+        Takes names in format YYYYMMDD with WA suffix, such as "20220714-WA0001" and its variations. Date tokens can be extracted directly
+        from name. Hour tokens cannot be extracted and they are assigned made up values based on index after 'WA'.
         """
         result = re.search(
             f"^({self._prefixes})?({match_year})({match_month})({match_day})-WA([0-9]+)",
@@ -140,8 +144,8 @@ class NameFixer:
 
     def disassemble_yymmdd(self, path):
         """
-        Takes names in format YYYYMMDD, such as "20220714". Date tokens can be extracted directly from name. Hour tokens cannot be
-        extracted and they are assigned as 0.
+        Takes names in format YYYYMMDD, such as "20220714" and its variations. Date tokens can be extracted directly
+        from name. Hour tokens cannot be extracted and they are assigned as 0.
         """
         result = re.search(
             f"^({self._prefixes})?({match_year})({match_month})({match_day})($|{self._suffixes})",
@@ -155,6 +159,33 @@ class NameFixer:
             month=int(result[2]),
             day=int(result[3]),
         )
+
+    def disassemble_pxl_yymmdd_hhmmss(self, path):
+        """
+        Takes names in Google Pixel format, such as "PXL_20250718_231309260.jpg".
+        """
+        pattern = (
+            f"PXL_"
+            f"({match_year})({match_month})({match_day})"
+            f"_"
+            f"({match_hour})({match_minute})({match_second})({match_millisecond})?"
+            f"($|(\\.MP))"
+        )
+        result = re.search(pattern, path.stem)
+        if result is None:
+            return None
+
+        result = result.groups()
+        date = datetime.datetime(
+            year=int(result[0]),
+            month=int(result[1]),
+            day=int(result[2]),
+            hour=int(result[3]),
+            minute=int(result[4]),
+            second=int(result[5]),
+        )
+        date += datetime.timedelta(hours=self.time_shift_pxl_hours)
+        return date
 
     def disassembly_from_metadata(self, path):
         """
@@ -315,6 +346,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("-m", "--allowmetadata", action="store_true", help="Allow looking at file metadata to find out the date. Not recommended. Requires --timezone.")
     arg_parser.add_argument("-t", "--timezone", type=str, help="Timezone used for extracting date from metadata.")
     arg_parser.add_argument("-s", "--timeshift", type=int, default=0, help="Hour shift applied to all extracted dates.")
+    arg_parser.add_argument("-p", "--timeshift_pxl", type=int, default=0, help="Hour shift applied to dates extracted from google pixel which always names as GMT+0.")
     args = arg_parser.parse_args()
     # fmt: on
 
@@ -334,7 +366,7 @@ if __name__ == "__main__":
             sys.exit(1)
 
     # Get files and prepare a rename map - a dictionary in which key is old filename and value is new filename
-    name_fixer = NameFixer(args.allowmetadata, timezone, args.timeshift)
+    name_fixer = NameFixer(args.allowmetadata, timezone, args.timeshift, args.timeshift_pxl)
     rename_map = RenameMap()
     files = get_files(args.directories)
     for file in files:
