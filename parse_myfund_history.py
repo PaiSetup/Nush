@@ -62,18 +62,19 @@ class OutputData:
                 last_contribution = values[1]
 
     def to_csv(self):
-        result = "date;investment_value;contribution_value\n"
+        result = "date;contribution_value;investment_value\n"
         for date, values in sorted(self._data.items()):
             result += date
             result += ";"
 
-            if values[0] is not None:
-                result += f"{values[0]:.2f}".replace(".", ",")
-            result += ";"
-
             if values[1] is not None:
                 result += f"{values[1]:.2f}".replace(".", ",")
+            result += ";"
+
+            if values[0] is not None:
+                result += f"{values[0]:.2f}".replace(".", ",")
             result += ";\n"
+
         return result
 
 
