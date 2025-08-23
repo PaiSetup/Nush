@@ -13,21 +13,15 @@ from dateutil.relativedelta import relativedelta
 
 
 class MyFundCsvType:
-    TotalInvestmentValue = (0, "investment_value")
-    OperationHistory = (1, "operation_history")
-
-    def get_index(self):
-        return self[0]
+    TotalInvestmentValue = auto()
+    OperationHistory = auto()
 
     @staticmethod
     def derive_from_csv_header(header):
         match header:
-            case "Data;Value of your investments;;\n" | "Data;Warto inwestycji;;\n":
+            case "Data;Warto inwestycji;;\n":
                 return MyFundCsvType.TotalInvestmentValue
-            case (
-                "Date;Operation;Account;Asset;Currency;Shares;Price;Commition;Tax;Value;Account balance after the operation;Number of units after operation;Investment account;Automatically added;Comment;\n"
-                | "Data;Operacja;Konto;Walor;Waluta;Liczba jednostek;Cena;Prowizja;Podatek;Warto;Stan konta po operacji;Liczba jednostek po operacji;Konto inwestycyjne;Automatycznie dodana;Komentarz;\n"
-            ):
+            case "Data;Operacja;Konto;Walor;Waluta;Liczba jednostek;Cena;Prowizja;Podatek;Warto;Stan konta po operacji;Liczba jednostek po operacji;Konto inwestycyjne;Automatycznie dodana;Komentarz;\n":
                 return MyFundCsvType.OperationHistory
             case _:
                 return None
@@ -42,38 +36,54 @@ class OutputData:
         try:
             entry = self._data[key]
         except KeyError:
-            entry = [None, None]
+            entry = [None, None, None]
         entry[idx] = value
         self._data[key] = entry
 
-    def set_investment_value(self, year, month, value):
+    def set_contribution_value(self, year, month, value):
         self._set_value(year, month, 0, value)
 
-    def set_contribution_value(self, year, month, value):
+    def set_investment_value(self, year, month, value):
         self._set_value(year, month, 1, value)
+
+    def set_polish_bonds_count(self, year, month, count):
+        self._set_value(year, month, 2, count)
 
     def fill_missing_values(self):
         last_contribution = 0
+        last_bond_count = 0
         for date, values in sorted(self._data.items()):
-            if values[1] is None:
-                values[1] = last_contribution
+            if values[0] is None:
+                values[0] = last_contribution
                 self._data[date] = values
             else:
-                last_contribution = values[1]
+                last_contribution = values[0]
+
+            if values[2] is None:
+                values[2] = last_bond_count
+                self._data[date] = values
+            else:
+                last_bond_count = values[2]
 
     def to_csv(self):
-        result = "date;contribution_value;investment_value\n"
+        result = "date;contribution_value;investment_value;polish_bond_count\n"
         for date, values in sorted(self._data.items()):
             result += date
+            result += ";"
+
+            if values[0] is not None:
+                result += f"{values[0]:.2f}".replace(".", ",")
             result += ";"
 
             if values[1] is not None:
                 result += f"{values[1]:.2f}".replace(".", ",")
             result += ";"
 
-            if values[0] is not None:
-                result += f"{values[0]:.2f}".replace(".", ",")
-            result += ";\n"
+            if values[2] is not None:
+                result += str(int(values[2]))
+            result += ";"
+
+            result += "\n"
 
         return result
 
@@ -93,10 +103,8 @@ def open_myfund_csv(file_path):
     return file, reader, csv_type
 
 
-def get_currency_rate(src_currency, date, offset_date_by_one=False):
-    # https://api.nbp.pl/api/exchangerates/rates/a/usd/2020-01-13
+def get_currency_rate(src_currency, date, offset_date_by_one=True):
     src_currency = src_currency.lower()
-    result = None
 
     # Prepare date range. There are no data for weekend dates and holidays, so we'll check a range and select the first date.
     first_date = date
@@ -143,49 +151,118 @@ def parse_total_investment_value_file(reader, output_data):
         previous_date = date
 
 
+class PolishBondCounter:
+    class Bond:
+        def __init__(self, product, count):
+            maturity_year = int("20" + product[5:7])
+            maturity_month = int(product[3:5])
+            self.product = product
+            self.maturity_date = datetime.date(maturity_year, maturity_month, 1)
+            self.count = count
+            self.sell_ops = []
+
+    def __init__(self):
+        self._edo_list = []
+
+    def buy(self, product, count):
+        if product.startswith("EDO"):
+            self._edo_list.append(PolishBondCounter.Bond(product, count))
+        else:
+            raise ValueError("Unsupported Polish bond")
+
+    def sell(self, product, count_to_sell, date):
+        if count_to_sell > 0:
+            raise ValueError("Expected negative value")
+        count_to_sell = -count_to_sell
+
+        if product.startswith("EDO"):
+            for bond in self._edo_list:
+                if product != bond.product:
+                    continue
+
+                # Calculate how much we can sell. Add a sell op
+                already_sold_count = sum((c for _, c in bond.sell_ops))
+                left_count = bond.count - already_sold_count
+                curr_sell_count = min(left_count, count_to_sell)
+                bond.sell_ops.append((date, curr_sell_count))
+
+                # If we have no more to sell, we can exit
+                count_to_sell -= curr_sell_count
+                if count_to_sell == 0:
+                    break
+        else:
+            raise ValueError("Unsupported Polish bond")
+
+    def get_count(self, date):
+        count = 0
+        for bond in self._edo_list:
+            # Check if this bond is mature and has already ended
+            if bond.maturity_date <= date:
+                continue
+
+            # Calculate how many bonds of this type we have unsold
+            bond_count = bond.count
+            for sell_date, sell_count in bond.sell_ops:
+                if sell_date <= date:
+                    bond_count -= sell_count
+
+            count += bond_count
+        return count
+
+
 def parse_operation_history_file(reader, output_data):
     total_contribution = 0
     previous_date = datetime.date(2000, 1, 1)
+    polish_bonds = PolishBondCounter()
 
     for row in reversed(list(reader)):
         # Parse current line
-        date = row[0]
-        date = date.split(" ")[0]  # there can be an hour specified after a space. We don't care
-        date = date.split("-")
-        date = datetime.date(*[int(x) for x in date])
-        if date.day != 1:
-            date = date.replace(day=1) + relativedelta(months=1)
+        real_date = row[0]
+        real_date = real_date.split(" ")[0]  # there can be an hour specified after a space. We don't care
+        real_date = real_date.split("-")
+        real_date = datetime.date(*[int(x) for x in real_date])
+        next_aligned_date = real_date
+        if next_aligned_date.day != 1:
+            next_aligned_date = next_aligned_date.replace(day=1) + relativedelta(months=1)
         operation = row[1]
+        product = row[3]
         currency = row[4]
+        count = row[5]
+        count = None if count == "-" else int(count)
         value = row[9]
         value = value.replace(",", ".")
         value = float(value)
 
-        # Check whether it's deposit or withdrawal
-        match operation:
-            case "Cash deposit" | "Wpata":
-                delta_sign = 1
-            case "Cash withdrawal" | "Wypata":
-                delta_sign = -1
-            case _:
-                continue
-
-        # Verify we're iterating from oldest to latest dates
-        if previous_date > date:
-            raise ValueError("ERROR: we're probably iterating in the wrong direction. Aborting.")
-        previous_date = date
-
-        # Exchange currency to PLN
+        # Handle cash deposit/withdrawal to calculate contribution value
         if currency != "PLN":
-            rate = get_currency_rate(currency, date)
+            rate = get_currency_rate(currency, real_date)
             if rate is None:
                 print(f"WARNING: cannot query currency rate for {currency}. Ignoring.", file=sys.stderr)
                 continue
             value *= rate
 
-        total_contribution += delta_sign * value
+        # Verify we're iterating from oldest to latest dates
+        if previous_date > real_date:
+            raise ValueError("ERROR: we're probably iterating in the wrong direction. Aborting.")
+        previous_date = real_date
 
-        output_data.set_contribution_value(date.year, date.month, total_contribution)
+        is_cash_op = operation in ["Wpata", "Wypata"]
+        is_buy_sell_op = operation in ["Kupno", "Sprzeda"]
+        is_buy_op = operation == "Kupno"
+
+        # Check operation type
+        if is_cash_op:
+            total_contribution += value  # Value is correctly signed
+            output_data.set_contribution_value(next_aligned_date.year, next_aligned_date.month, total_contribution)
+        elif is_buy_sell_op and product.startswith("EDO"):
+            if is_buy_op:
+                polish_bonds.buy(product, count)
+            else:
+                polish_bonds.sell(product, count, real_date)
+
+        # Update polish bonds value. Theoretically this is not correct, because this code gets called after a financial operation
+        # and bonds could get mature in a month without any operations. In that case it will be updated only after the next operation.
+        output_data.set_polish_bonds_count(next_aligned_date.year, next_aligned_date.month, polish_bonds.get_count(next_aligned_date))
 
 
 if __name__ == "__main__":
