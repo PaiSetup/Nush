@@ -15,6 +15,7 @@ from dateutil.relativedelta import relativedelta
 class MyFundCsvType:
     TotalInvestmentValue = auto()
     OperationHistory = auto()
+    InvestmentAccountSplit = auto()
 
     @staticmethod
     def derive_from_csv_header(header):
@@ -24,19 +25,23 @@ class MyFundCsvType:
             case "Data;Operacja;Konto;Walor;Waluta;Liczba jednostek;Cena;Prowizja;Podatek;Warto;Stan konta po operacji;Liczba jednostek po operacji;Konto inwestycyjne;Automatycznie dodana;Komentarz;\n":
                 return MyFundCsvType.OperationHistory
             case _:
+                # There's no specific header for this, because it depends on our investment accounts within MyFund. Detect it heuristically.
+                if header.startswith("Data;") and ";Konto gotwkowe;" in header and header.endswith(";;\n"):
+                    return MyFundCsvType.InvestmentAccountSplit
                 return None
 
 
 class OutputData:
     def __init__(self):
         self._data = {}
+        self._investment_accounts = []
 
     def _set_value(self, year, month, idx, value):
         key = f"{year}-{str(month).zfill(2)}-01"
         try:
             entry = self._data[key]
         except KeyError:
-            entry = [None, None, None]
+            entry = [None, None, None, None]
         entry[idx] = value
         self._data[key] = entry
 
@@ -48,6 +53,14 @@ class OutputData:
 
     def set_polish_bonds_count(self, year, month, count):
         self._set_value(year, month, 2, count)
+
+    def set_investment_accounts(self, accounts):
+        self._investment_accounts = accounts
+
+    def set_per_account_values(self, year, month, values):
+        if len(self._investment_accounts) != len(values):
+            raise ValueError("Invalid number of per account values")
+        self._set_value(year, month, 3, values)
 
     def fill_missing_values(self):
         last_contribution = 0
@@ -66,22 +79,33 @@ class OutputData:
                 last_bond_count = values[2]
 
     def to_csv(self):
-        result = "date;contribution_value;investment_value;polish_bond_count\n"
+        # Create header
+        result = "date;contribution_value;investment_value;polish_bond_count"
+        if self._investment_accounts:
+            result += ";"
+            result += ";".join((f"value ({x})" for x in self._investment_accounts))
+        result += "\n"
+
+        # Create data lines
         for date, values in sorted(self._data.items()):
             result += date
-            result += ";"
 
+            result += ";"
             if values[0] is not None:
                 result += f"{values[0]:.2f}".replace(".", ",")
-            result += ";"
 
+            result += ";"
             if values[1] is not None:
                 result += f"{values[1]:.2f}".replace(".", ",")
-            result += ";"
 
+            result += ";"
             if values[2] is not None:
                 result += str(int(values[2]))
-            result += ";"
+
+            if values[3] is not None:
+                for value in values[3]:
+                    result += ";"
+                    result += f"{value:.2f}".replace(".", ",")
 
             result += "\n"
 
@@ -100,7 +124,7 @@ def open_myfund_csv(file_path):
         return None
 
     reader = csv.reader(file, delimiter=";")
-    return file, reader, csv_type
+    return file, reader, header, csv_type
 
 
 def get_currency_rate(src_currency, date, offset_date_by_one=True):
@@ -265,6 +289,26 @@ def parse_operation_history_file(reader, output_data):
         output_data.set_polish_bonds_count(next_aligned_date.year, next_aligned_date.month, polish_bonds.get_count(next_aligned_date))
 
 
+def parse_investment_account_split(reader, header, output_data):
+    # Parse the header, so we now how accounts we have
+    accounts = header.strip().split(";")
+    accounts = [x for x in accounts if x]
+    accounts = accounts[1:]
+    accounts_count = len(accounts)
+    output_data.set_investment_accounts(accounts)
+
+    for row in list(reader):
+        date = row[0]
+        date = date.split("-")
+        date = datetime.date(*[int(x) for x in date])
+        if date.day != 1:
+            date = date.replace(day=1) + relativedelta(months=1)
+
+        values = row[1 : 1 + accounts_count]
+        values = [float(x.replace(",", ".")) for x in values]
+        output_data.set_per_account_values(date.year, date.month, values)
+
+
 if __name__ == "__main__":
     # fmt: off
     description = """
@@ -277,6 +321,7 @@ if __name__ == "__main__":
         Input files are specified as positional cmdline arguments in any order.
           (1) https://myfund.pl/index.php?raport=WartoscInwestycjiWCzasie&dataStart=2022-01-01
           (2) https://myfund.pl/index.php?raport=historiaOperacji&dataStart=2022-01-01
+          (3) https://myfund.pl/index.php?raport=SkladPortfelaKonta&dataStart=2022-01-01
     """
     arg_parser = argparse.ArgumentParser(description=description, allow_abbrev=False)
     arg_parser.add_argument("files", type=Path, nargs="+", help="CSV files downloaded from MyFund")
@@ -292,7 +337,7 @@ if __name__ == "__main__":
         if result is None:
             print(f"ERROR: Could not open or parse {file_path}", sys.stderr)
             sys.exit(1)
-        file, reader, csv_type = result
+        file, reader, header, csv_type = result
 
         # Verify we haven't seen this file type yet
         if csv_type in parsed_csv_types:
@@ -306,6 +351,8 @@ if __name__ == "__main__":
                     parse_total_investment_value_file(reader, output_data)
                 case MyFundCsvType.OperationHistory:
                     parse_operation_history_file(reader, output_data)
+                case MyFundCsvType.InvestmentAccountSplit:
+                    parse_investment_account_split(reader, header, output_data)
                 case _:
                     print(f"ERROR: illegal MyFundCsvType ({csv_type})", sys.stderr)
                     sys.exit(1)
