@@ -62,23 +62,29 @@ class OutputData:
             raise ValueError("Invalid number of per account values")
         self._set_value(year, month, 3, values)
 
-    def fill_missing_values(self):
-        last_contribution = 0
-        last_bond_count = 0
+    def fill_missing_values(self, zero_fill=False):
+        zero_values = [
+            0,
+            0,
+            0,
+            [0] * len(self._investment_accounts),
+        ]
+        last_values = zero_values.copy()
         for date, values in sorted(self._data.items()):
-            if values[0] is None:
-                values[0] = last_contribution
-                self._data[date] = values
-            else:
-                last_contribution = values[0]
-
-            if values[2] is None:
-                values[2] = last_bond_count
-                self._data[date] = values
-            else:
-                last_bond_count = values[2]
+            for idx in range(len(last_values)):
+                if values[idx] is None:
+                    if zero_fill:
+                        values[idx] = zero_values[idx]
+                    else:
+                        values[idx] = last_values[idx]
+                        self._data[date] = values
+                else:
+                    last_values[idx] = values[idx]
 
     def to_csv(self):
+        float_to_str = lambda f: f"{f:.2f}".replace(".", ",")
+        int_to_str = lambda i: str(int(i))
+
         # Create header
         result = "date;contribution_value;investment_value;polish_bond_count"
         if self._investment_accounts:
@@ -91,22 +97,17 @@ class OutputData:
             result += date
 
             result += ";"
-            if values[0] is not None:
-                result += f"{values[0]:.2f}".replace(".", ",")
+            result += float_to_str(values[0])
 
             result += ";"
-            if values[1] is not None:
-                result += f"{values[1]:.2f}".replace(".", ",")
+            result += float_to_str(values[1])
 
             result += ";"
-            if values[2] is not None:
-                result += str(int(values[2]))
+            result += int_to_str(values[2])
 
-            if values[3] is not None:
-                for value in values[3]:
-                    result += ";"
-                    result += f"{value:.2f}".replace(".", ",")
-
+            for value in values[3]:
+                result += ";"
+                result += float_to_str(value)
             result += "\n"
 
         return result
@@ -147,32 +148,22 @@ def get_currency_rate(src_currency, date, offset_date_by_one=True):
     return jsonResponse["rates"][0]["mid"]
 
 
-def parse_total_investment_value_file(reader, output_data):
-    previous_value = 0
-    previous_date = None
-    for row in reader:
-        # Parse current line
-        date = row[0]
-        date = date.split("-")
-        date = datetime.date(*[int(x) for x in date])
-        value = row[1]
-        value = value.replace(",", ".")
-        value = float(value)
+def parse_date(date_str, align_to_next_month):
+    date = date_str
+    date = date.split(" ")[0]  # there can be an hour specified after a space. We don't care
+    date = date.split("-")
+    date = datetime.date(*[int(x) for x in date])
+    if align_to_next_month:
+        if date.day != 1:
+            date = date.replace(day=1) + relativedelta(months=1)
+    return date
 
-        # Determine whether we save a new entry to the output data object. We do it in two scenarios:
-        #  1. This is the first line.
-        #  2. Month changed - it means we encountered the first day of the month.
-        if previous_date is None or previous_date.month != date.month:
-            if date.day == 1:
-                value_to_display = value
-            else:
-                value_to_display = previous_value
 
-            output_data.set_investment_value(date.year, date.month, value_to_display)
-
-        # Save current line as previous
-        previous_value = value
-        previous_date = date
+def parse_float(float_str):
+    value = float_str
+    value = value.replace(",", ".")
+    value = float(value)
+    return value
 
 
 class PolishBondCounter:
@@ -234,6 +225,29 @@ class PolishBondCounter:
         return count
 
 
+def parse_total_investment_value_file(reader, output_data):
+    for row in reader:
+        date = parse_date(row[0], align_to_next_month=True)
+        value = parse_float(row[1])
+        output_data.set_investment_value(date.year, date.month, value)
+
+
+def parse_investment_account_split(reader, header, output_data):
+    # Parse the header, so we now how accounts we have
+    accounts = header.strip().split(";")
+    accounts = [x for x in accounts if x]
+    accounts = accounts[1:]
+    accounts_count = len(accounts)
+    output_data.set_investment_accounts(accounts)
+
+    for row in list(reader):
+        date = parse_date(row[0], align_to_next_month=True)
+
+        values = row[1 : 1 + accounts_count]
+        values = [parse_float(x) for x in values]
+        output_data.set_per_account_values(date.year, date.month, values)
+
+
 def parse_operation_history_file(reader, output_data):
     total_contribution = 0
     previous_date = datetime.date(2000, 1, 1)
@@ -241,21 +255,14 @@ def parse_operation_history_file(reader, output_data):
 
     for row in reversed(list(reader)):
         # Parse current line
-        real_date = row[0]
-        real_date = real_date.split(" ")[0]  # there can be an hour specified after a space. We don't care
-        real_date = real_date.split("-")
-        real_date = datetime.date(*[int(x) for x in real_date])
-        next_aligned_date = real_date
-        if next_aligned_date.day != 1:
-            next_aligned_date = next_aligned_date.replace(day=1) + relativedelta(months=1)
+        real_date = parse_date(row[0], align_to_next_month=False)
+        next_aligned_date = parse_date(row[0], align_to_next_month=True)
         operation = row[1]
         product = row[3]
         currency = row[4]
         count = row[5]
         count = None if count == "-" else int(count)
-        value = row[9]
-        value = value.replace(",", ".")
-        value = float(value)
+        value = parse_float(row[9])
 
         # Handle cash deposit/withdrawal to calculate contribution value
         if currency != "PLN":
@@ -289,39 +296,26 @@ def parse_operation_history_file(reader, output_data):
         output_data.set_polish_bonds_count(next_aligned_date.year, next_aligned_date.month, polish_bonds.get_count(next_aligned_date))
 
 
-def parse_investment_account_split(reader, header, output_data):
-    # Parse the header, so we now how accounts we have
-    accounts = header.strip().split(";")
-    accounts = [x for x in accounts if x]
-    accounts = accounts[1:]
-    accounts_count = len(accounts)
-    output_data.set_investment_accounts(accounts)
-
-    for row in list(reader):
-        date = row[0]
-        date = date.split("-")
-        date = datetime.date(*[int(x) for x in date])
-        if date.day != 1:
-            date = date.replace(day=1) + relativedelta(months=1)
-
-        values = row[1 : 1 + accounts_count]
-        values = [float(x.replace(",", ".")) for x in values]
-        output_data.set_per_account_values(date.year, date.month, values)
-
-
 if __name__ == "__main__":
     # fmt: off
     description = """
         MyFund allows downloading CSV files (semicolon delimeted) with various data from the account. This script consumes these
-        files and produces per-month summary as csv. Total investments value is generated based on csv file (1). The numbers in
-        the file are presented as-is, just normalized to only show value at first day of each month. Total investment contribution
-        is calculated based on csv file (2) by filtering cash deposit/withdrawal events and summing them. Cash operations in foreign
-        values are translated to PLN using NBP API.
+        files and produces per-month summary as csv. All outputs are normalized to show values as of the first day of each month.
+        For example, if some shares we bough May 16, they will show up for June, not for May.
 
         Input files are specified as positional cmdline arguments in any order.
           (1) https://myfund.pl/index.php?raport=WartoscInwestycjiWCzasie&dataStart=2022-01-01
           (2) https://myfund.pl/index.php?raport=historiaOperacji&dataStart=2022-01-01
           (3) https://myfund.pl/index.php?raport=SkladPortfelaKonta&dataStart=2022-01-01
+
+        Total investments value is generated based on csv file (1). The numbers in the file are presented as-is, just normalized to
+        only show value at first day of each month.
+
+        Total investment contribution is calculated based on csv file (2) by filtering cash deposit/withdrawal events and summing them.
+        Cash operations in foreign values are translated to PLN using NBP API. File (2) is also used to calculate current number of
+        polish bonds owned.
+
+        File (3) is used to retrieve values for each investment account.
     """
     arg_parser = argparse.ArgumentParser(description=description, allow_abbrev=False)
     arg_parser.add_argument("files", type=Path, nargs="+", help="CSV files downloaded from MyFund")
