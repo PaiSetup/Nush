@@ -13,15 +13,12 @@ from dateutil.relativedelta import relativedelta
 
 
 class MyFundCsvType:
-    TotalInvestmentValue = auto()
     OperationHistory = auto()
     InvestmentAccountSplit = auto()
 
     @staticmethod
     def derive_from_csv_header(header):
         match header:
-            case "Data;Warto inwestycji;;\n":
-                return MyFundCsvType.TotalInvestmentValue
             case "Data;Operacja;Konto;Walor;Waluta;Liczba jednostek;Cena;Prowizja;Podatek;Warto;Stan konta po operacji;Liczba jednostek po operacji;Konto inwestycyjne;Automatycznie dodana;Komentarz;\n":
                 return MyFundCsvType.OperationHistory
             case _:
@@ -32,82 +29,111 @@ class MyFundCsvType:
 
 
 class OutputData:
+    class Column:
+        def __init__(self, name, data_type, priority):
+            self.name = name
+            self.data_type = data_type
+            self.priority = priority
+
+        def get_sortkey(self):
+            return (self.priority, self.name)
+
     def __init__(self):
         self._data = {}
-        self._investment_accounts = []
+        self._columns = []
 
-    def _set_value(self, year, month, idx, value):
+    def _get_column(self, column_name, value, column_priority):
+        data_type = type(value)
+
+        # Find existing column. If we find it, verify other fields are matching.
+        column_idx = -1
+        column = None
+        for i, c in enumerate(self._columns):
+            if column_name != c.name:
+                continue
+            if data_type != c.data_type:
+                raise TypeError(f"Type of column {column_name} changed")
+            if column_priority != c.priority:
+                raise TypeError(f"Priority of column {column_name} changed")
+            column = c
+            column_idx = i
+            break
+
+        # If we didn't find the column, create a new one
+        if column is None:
+            self._columns.append(OutputData.Column(column_name, data_type, column_priority))
+            column_idx = len(self._columns) - 1
+
+        return column_idx
+
+    def _align_to_columns(self, entry):
+        curr_length = len(entry)
+        expected_length = len(self._columns)
+        if expected_length > curr_length:
+            entry += [None] * (expected_length - curr_length)
+        return entry
+
+    def set_value(self, year, month, column_name, value, column_priority):
+        # Get existing column index or create new
+        column_idx = self._get_column(column_name, value, column_priority)
+
+        # Get existing data row or create new
         key = f"{year}-{str(month).zfill(2)}-01"
         try:
             entry = self._data[key]
         except KeyError:
-            entry = [None, None, None, None]
-        entry[idx] = value
+            entry = []
+        entry = self._align_to_columns(entry)
+
+        # Write new data
+        entry[column_idx] = value
         self._data[key] = entry
 
-    def set_contribution_value(self, year, month, value):
-        self._set_value(year, month, 0, value)
-
-    def set_investment_value(self, year, month, value):
-        self._set_value(year, month, 1, value)
-
-    def set_polish_bonds_count(self, year, month, count):
-        self._set_value(year, month, 2, count)
-
-    def set_investment_accounts(self, accounts):
-        self._investment_accounts = accounts
-
-    def set_per_account_values(self, year, month, values):
-        if len(self._investment_accounts) != len(values):
-            raise ValueError("Invalid number of per account values")
-        self._set_value(year, month, 3, values)
-
     def fill_missing_values(self, zero_fill=False):
-        zero_values = [
-            0,
-            0,
-            0,
-            [0] * len(self._investment_accounts),
-        ]
+        # Make sure all rows have the same number of columns
+        for date, entry in self._data.items():
+            self._data[date] = self._align_to_columns(entry)
+
+        column_count = len(self._columns)
+        zero_values = [c.data_type(0) for c in self._columns]
         last_values = zero_values.copy()
-        for date, values in sorted(self._data.items()):
-            for idx in range(len(last_values)):
-                if values[idx] is None:
+        for date, entry in sorted(self._data.items()):
+            for column_idx in range(column_count):
+                if entry[column_idx] is None:
                     if zero_fill:
-                        values[idx] = zero_values[idx]
+                        entry[column_idx] = zero_values[column_idx]
                     else:
-                        values[idx] = last_values[idx]
-                        self._data[date] = values
+                        entry[column_idx] = last_values[column_idx]
+                        self._data[date] = entry
                 else:
-                    last_values[idx] = values[idx]
+                    last_values[column_idx] = entry[column_idx]
 
     def to_csv(self):
-        float_to_str = lambda f: f"{f:.2f}".replace(".", ",")
-        int_to_str = lambda i: str(int(i))
+        to_str_funcs = {
+            int: lambda i: str(int(i)),
+            float: lambda f: f"{f:.2f}".replace(".", ","),
+        }
+
+        # Sort columns alphabetically by name and prepare a reorder list so we can reorder each row in the same way
+        reordered_columns = sorted(self._columns, key=lambda c: c.get_sortkey())
+        reorder_list = sorted(range(len(self._columns)), key=lambda i: self._columns[i].get_sortkey())
 
         # Create header
-        result = "date;contribution_value;investment_value;polish_bond_count"
-        if self._investment_accounts:
-            result += ";"
-            result += ";".join((f"value ({x})" for x in self._investment_accounts))
+        result = "date;"
+        result += ";".join([c.name for c in reordered_columns])
         result += "\n"
 
         # Create data lines
-        for date, values in sorted(self._data.items()):
+        for date, entry in sorted(self._data.items()):
             result += date
-
             result += ";"
-            result += float_to_str(values[0])
 
-            result += ";"
-            result += float_to_str(values[1])
+            reordered_entry = [entry[i] for i in reorder_list]
 
-            result += ";"
-            result += int_to_str(values[2])
-
-            for value in values[3]:
+            for column, value in zip(reordered_columns, reordered_entry):
+                result += to_str_funcs[column.data_type](value)
                 result += ";"
-                result += float_to_str(value)
+
             result += "\n"
 
         return result
@@ -225,33 +251,27 @@ class PolishBondCounter:
         return count
 
 
-def parse_total_investment_value_file(reader, output_data):
-    for row in reader:
-        date = parse_date(row[0], align_to_next_month=True)
-        value = parse_float(row[1])
-        output_data.set_investment_value(date.year, date.month, value)
-
-
 def parse_investment_account_split(reader, header, output_data):
     # Parse the header, so we now how accounts we have
     accounts = header.strip().split(";")
     accounts = [x for x in accounts if x]
     accounts = accounts[1:]
     accounts_count = len(accounts)
-    output_data.set_investment_accounts(accounts)
+    column_names = [f"value ({x})" for x in accounts]
 
     for row in list(reader):
         date = parse_date(row[0], align_to_next_month=True)
 
         values = row[1 : 1 + accounts_count]
         values = [parse_float(x) for x in values]
-        output_data.set_per_account_values(date.year, date.month, values)
+        for column_name, value in zip(column_names, values):
+            output_data.set_value(date.year, date.month, column_name, value, 2)
 
 
 def parse_operation_history_file(reader, output_data):
-    total_contribution = 0
     previous_date = datetime.date(2000, 1, 1)
     polish_bonds = PolishBondCounter()
+    contribution_per_account = {}
 
     for row in reversed(list(reader)):
         # Parse current line
@@ -263,8 +283,12 @@ def parse_operation_history_file(reader, output_data):
         count = row[5]
         count = None if count == "-" else int(count)
         value = parse_float(row[9])
+        account = row[12]
+        if not account:
+            raise ValueError("No investment account set")
 
         # Handle cash deposit/withdrawal to calculate contribution value
+        # TODO do this lazily
         if currency != "PLN":
             rate = get_currency_rate(currency, real_date)
             if rate is None:
@@ -283,8 +307,11 @@ def parse_operation_history_file(reader, output_data):
 
         # Check operation type
         if is_cash_op:
-            total_contribution += value  # Value is correctly signed
-            output_data.set_contribution_value(next_aligned_date.year, next_aligned_date.month, total_contribution)
+            if account not in contribution_per_account:
+                contribution_per_account[account] = float(0)
+            contribution_per_account[account] += value  # 'value' is correctly signed
+
+            output_data.set_value(next_aligned_date.year, next_aligned_date.month, f"contribution ({account})", contribution_per_account[account], 1)
         elif is_buy_sell_op and product.startswith("EDO"):
             if is_buy_op:
                 polish_bonds.buy(product, count)
@@ -293,7 +320,7 @@ def parse_operation_history_file(reader, output_data):
 
         # Update polish bonds value. Theoretically this is not correct, because this code gets called after a financial operation
         # and bonds could get mature in a month without any operations. In that case it will be updated only after the next operation.
-        output_data.set_polish_bonds_count(next_aligned_date.year, next_aligned_date.month, polish_bonds.get_count(next_aligned_date))
+        output_data.set_value(next_aligned_date.year, next_aligned_date.month, "polish bond count", polish_bonds.get_count(next_aligned_date), 0)
 
 
 if __name__ == "__main__":
@@ -301,21 +328,17 @@ if __name__ == "__main__":
     description = """
         MyFund allows downloading CSV files (semicolon delimeted) with various data from the account. This script consumes these
         files and produces per-month summary as csv. All outputs are normalized to show values as of the first day of each month.
-        For example, if some shares we bough May 16, they will show up for June, not for May.
+        For example, if some shares were bought May 16, they will show up for June, not for May.
 
         Input files are specified as positional cmdline arguments in any order.
-          (1) https://myfund.pl/index.php?raport=WartoscInwestycjiWCzasie&dataStart=2022-01-01
-          (2) https://myfund.pl/index.php?raport=historiaOperacji&dataStart=2022-01-01
-          (3) https://myfund.pl/index.php?raport=SkladPortfelaKonta&dataStart=2022-01-01
+          (1) https://myfund.pl/index.php?raport=historiaOperacji&dataStart=2022-01-01
+          (2) https://myfund.pl/index.php?raport=SkladPortfelaKonta&dataStart=2022-01-01
 
-        Total investments value is generated based on csv file (1). The numbers in the file are presented as-is, just normalized to
-        only show value at first day of each month.
+        Investment contribution is retrieved per investment account based on csv file (1) by filtering cash deposit/withdrawal events
+        and summing them. Cash operations in foreign values are translated to PLN using NBP API. File (2) is also used to calculate
+        current number of polish bonds owned.
 
-        Total investment contribution is calculated based on csv file (2) by filtering cash deposit/withdrawal events and summing them.
-        Cash operations in foreign values are translated to PLN using NBP API. File (2) is also used to calculate current number of
-        polish bonds owned.
-
-        File (3) is used to retrieve values for each investment account.
+        File (2) is used to retrieve investment values for each investment account.
     """
     arg_parser = argparse.ArgumentParser(description=description, allow_abbrev=False)
     arg_parser.add_argument("files", type=Path, nargs="+", help="CSV files downloaded from MyFund")
@@ -341,8 +364,6 @@ if __name__ == "__main__":
         # Parse the file
         with file:
             match csv_type:
-                case MyFundCsvType.TotalInvestmentValue:
-                    parse_total_investment_value_file(reader, output_data)
                 case MyFundCsvType.OperationHistory:
                     parse_operation_history_file(reader, output_data)
                 case MyFundCsvType.InvestmentAccountSplit:
