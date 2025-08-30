@@ -169,7 +169,7 @@ class NameFixer:
             f"({match_year})({match_month})({match_day})"
             f"_"
             f"({match_hour})({match_minute})({match_second})({match_millisecond})?"
-            f"($|(\\.MP))"
+            f"($|(\\.MP)|(~[0-9]+))"
         )
         result = re.search(pattern, path.stem)
         if result is None:
