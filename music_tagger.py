@@ -1,11 +1,12 @@
 #!/bin/python
 
-from pathlib import Path
-import enum
 import argparse
-import shutil
-import music_tag
+import enum
 import re
+import shutil
+from pathlib import Path
+
+import music_tag
 
 
 class MusicTaggerException(Exception):
@@ -61,7 +62,7 @@ class MusicFile:
         allowed_extensions = [
             ".mp3",
             ".flac",
-            ".mp4"
+            ".mp4",
         ]
 
         music_files = []
@@ -99,7 +100,7 @@ class MusicFile:
         patterns = [
             "[0-9]+[. -]+(.*)",  # e.g. "01. Fear of the dark"
             f"{author} - (.*)",  # e.g. "Iron Maiden - Fear of the dark"
-            "([A-Za-z '0-9]+)",     # e.g. "Fear of the dark"
+            "([A-Za-z '0-9]+)",  # e.g. "Fear of the dark"
         ]
         for pattern in patterns:
             result = re.match(pattern, self._src_path.stem)
@@ -204,7 +205,7 @@ if __name__ == "__main__":
     elif args.mode == OperationMode.RenameInPlace:
         # Rename all files
         for file in files:
-            file.rename(rgs.dry_run)
+            file.rename(args.dry_run)
     else:
         raise MusicTaggerException("Unknown operation mode")
     print()
