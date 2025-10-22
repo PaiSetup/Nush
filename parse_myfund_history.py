@@ -326,21 +326,21 @@ def parse_operation_history_file(reader, output_data):
 if __name__ == "__main__":
     # fmt: off
     description = """
-        MyFund allows downloading CSV files (semicolon delimeted) with various data from the account. This script consumes these
-        files and produces per-month summary as csv. All outputs are normalized to show values as of the first day of each month.
-        For example, if some shares were bought May 16, they will show up for June, not for May.
+MyFund allows downloading CSV files (semicolon delimeted) with various data from the account. This script consumes these
+files and produces per-month summary as csv. All outputs are normalized to show values as of the first day of each month.
+For example, if some shares were bought May 16, they will show up for June, not for May.
 
-        Input files are specified as positional cmdline arguments in any order.
-          (1) https://myfund.pl/index.php?raport=historiaOperacji&dataStart=2022-01-01
-          (2) https://myfund.pl/index.php?raport=SkladPortfelaKonta&dataStart=2022-01-01
+Input files are specified as positional cmdline arguments in any order.
+    (1) https://myfund.pl/index.php?raport=historiaOperacji&dataStart=2022-01-01
+    (2) https://myfund.pl/index.php?raport=SkladPortfelaKonta&dataStart=2022-01-01
 
-        Investment contribution is retrieved per investment account based on csv file (1) by filtering cash deposit/withdrawal events
-        and summing them. Cash operations in foreign values are translated to PLN using NBP API. File (2) is also used to calculate
-        current number of polish bonds owned.
+Investment contribution is retrieved per investment account based on csv file (1) by filtering cash deposit/withdrawal events
+and summing them. Cash operations in foreign values are translated to PLN using NBP API. File (2) is also used to calculate
+current number of polish bonds owned.
 
-        File (2) is used to retrieve investment values for each investment account.
+File (2) is used to retrieve investment values for each investment account.
     """
-    arg_parser = argparse.ArgumentParser(description=description, allow_abbrev=False)
+    arg_parser = argparse.ArgumentParser(description=description, allow_abbrev=False, formatter_class=argparse.RawTextHelpFormatter)
     arg_parser.add_argument("files", type=Path, nargs="+", help="CSV files downloaded from MyFund")
     args = arg_parser.parse_args()
     # fmt: on
