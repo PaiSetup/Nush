@@ -188,6 +188,7 @@ def parse_date(date_str, align_to_next_month):
 def parse_float(float_str):
     value = float_str
     value = value.replace(",", ".")
+    value = value.replace(" ", "")
     value = float(value)
     return value
 
