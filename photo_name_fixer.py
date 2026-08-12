@@ -55,7 +55,7 @@ def run_command(command, *, stdin=subprocess.PIPE):
 
 class NameFixer:
     def __init__(self, allow_metadata, timezone, time_shift_hours, time_shift_pxl_hours):
-        self._prefixes = r"IMG|IMG-|IMG_|VID_|VideoCapture_"
+        self._prefixes = r"IMG|IMG-|IMG_|VID_|VID|VideoCapture_"
         self._suffixes = r"_HDR|-WA[0-9]+|_TIMEBURST[0-9]+|_[0-9]+|~[0-9]+| ?\([0-9]+\)"
         self.time_shift_hours = time_shift_hours
         self.time_shift_pxl_hours = time_shift_pxl_hours
