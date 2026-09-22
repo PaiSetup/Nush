@@ -293,7 +293,7 @@ def parse_operation_history_file(reader, output_data):
         if currency != "PLN":
             rate = get_currency_rate(currency, real_date)
             if rate is None:
-                print(f"WARNING: cannot query currency rate for {currency}. Ignoring.", file=sys.stderr)
+                print(f"WARNING: cannot query currency rate for {currency} in {real_date}. Ignoring.", file=sys.stderr)
                 continue
             value *= rate
 
