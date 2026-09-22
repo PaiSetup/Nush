@@ -108,7 +108,7 @@ class OutputData:
                 else:
                     last_values[column_idx] = entry[column_idx]
 
-    def to_csv(self):
+    def to_csv(self, separator):
         to_str_funcs = {
             int: lambda i: str(int(i)),
             float: lambda f: f"{f:.2f}".replace(".", ","),
@@ -119,20 +119,19 @@ class OutputData:
         reorder_list = sorted(range(len(self._columns)), key=lambda i: self._columns[i].get_sortkey())
 
         # Create header
-        result = "date;"
-        result += ";".join([c.name for c in reordered_columns])
+        result = f"date{separator}"
+        result += separator.join([c.name for c in reordered_columns])
         result += "\n"
 
         # Create data lines
         for date, entry in sorted(self._data.items()):
             result += date
-            result += ";"
 
             reordered_entry = [entry[i] for i in reorder_list]
 
             for column, value in zip(reordered_columns, reordered_entry):
+                result += separator
                 result += to_str_funcs[column.data_type](value)
-                result += ";"
 
             result += "\n"
 
@@ -374,4 +373,4 @@ File (2) is used to retrieve investment values for each investment account.
                     sys.exit(1)
 
     output_data.fill_missing_values()
-    print(output_data.to_csv(), end="")
+    print(output_data.to_csv("\t"), end="")
