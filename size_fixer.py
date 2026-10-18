@@ -58,25 +58,117 @@ def generate_str_percentage(value, max_value):
         return f"{percentage:.1f}% TOO BIG"
 
 
-def downscale_video(inp_path, out_path, max_video_bitrate_bps):
+def downscale_video(inp_path, out_path, max_video_bitrate_bps, min_bpp=0.06):
+    """
+    Limits video bitrate, keeping seeking fast and the result widely playable.
+
+    - If the bitrate cap gives fewer than min_bpp bits per pixel at the source
+      resolution, the video is also downscaled to the largest size that does
+      (the source size itself is tried first, then a standard ladder).
+    - Output is always 8-bit H.264 Main, no B-frames, ~1 s GOP, so it seeks
+      fast and hardware-decodes everywhere. 10-bit sources are converted and
+      HDR (HLG/PQ) sources are tone-mapped to SDR BT.709.
+    - Rotation tags (phone videos) are handled: ffmpeg rotates before filters.
+    """
+    import json
+    import shlex
+
+    def parse_fps(value):
+        try:
+            num, den = map(int, str(value).split("/"))
+            return num / den if den else 0.0
+        except (ValueError, TypeError):
+            return 0.0
+
+    def probe(path):
+        cmd = (
+            "ffprobe -v quiet -select_streams v:0 "
+            "-show_entries stream=width,height,avg_frame_rate,r_frame_rate,bit_rate,color_transfer"
+            ":format=bit_rate,duration,size "
+            f"-of json {shlex.quote(str(path))}"
+        )
+        out = run_command(cmd)
+        if isinstance(out, bytes):
+            out = out.decode()
+        data = json.loads(out)
+        s = data["streams"][0]
+        fmt = data.get("format", {})
+
+        fps = parse_fps(s.get("avg_frame_rate")) or parse_fps(s.get("r_frame_rate")) or 30.0
+
+        # Some containers (e.g. mkv) don't store a per-stream bitrate
+        bitrate = s.get("bit_rate") or fmt.get("bit_rate")
+        if not bitrate and fmt.get("duration") and fmt.get("size"):
+            bitrate = float(fmt["size"]) * 8 / float(fmt["duration"])
+        if not bitrate:
+            raise RuntimeError(f"Cannot determine bitrate of {path}")
+
+        return int(s["width"]), int(s["height"]), fps, int(float(bitrate)), s.get("color_transfer", "") or ""
+
     def get_bitrate(path):
-        probe_command = f'ffprobe -v quiet -select_streams v:0 -show_entries stream=bit_rate -of default=noprint_wrappers=1:nokey=1 "{path}"'
-        bitrate = run_command(probe_command)
-        bitrate = bitrate.strip()
-        return int(bitrate)
+        return probe(path)[3]
+
+    def pick_short_side(width, height, fps):
+        """Largest short-side size that reaches min_bpp at the bitrate cap."""
+        short = min(width, height)
+        long = max(width, height)
+        ladder = [2160, 1440, 1080, 720, 480]
+        candidates = [short] + [s for s in ladder if s < short]
+        for s in candidates:
+            pixels = s * (long * s / short)
+            if max_video_bitrate_bps / (pixels * fps) >= min_bpp:
+                return s
+        # Nothing reaches min_bpp: use the smallest step (never upscale)
+        return min(short, ladder[-1])
 
     str_file = f"{inp_path} -> {out_path}"
 
     # Try to early return
     original_size = inp_path.stat().st_size
-    original_bitrate = get_bitrate(inp_path)
+    width, height, fps, original_bitrate, color_transfer = probe(inp_path)
     if original_bitrate <= max_video_bitrate_bps:
         shutil.copyfile(inp_path, out_path)
         return f"Video copied {str_file} (bitrate was {original_bitrate//1024} KBPS)"
 
-    # Perform downscaling
-    command = f'ffmpeg -i "{inp_path}" -filter:v "scale" -b:v {max_video_bitrate_bps} "{out_path}" -y'
-    run_command(command)
+    # Build the filter chain
+    short_side = pick_short_side(width, height, fps)
+    downscaled = short_side < min(width, height)
+    filters = []
+    if downscaled:
+        # iw/ih are the post-rotation frame size, so this works for any orientation
+        filters.append(f"scale=w='if(gt(iw,ih),-2,{short_side})':h='if(gt(iw,ih),{short_side},-2)'")
+    color_opts = ""
+    if color_transfer in ("arib-std-b67", "smpte2084"):
+        # HDR (HLG / PQ) -> SDR BT.709
+        filters.append("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709," "tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv")
+        color_opts = "-colorspace bt709 -color_primaries bt709 -color_trc bt709 "
+    filters.append("format=yuv420p")  # 8-bit, required for H.264 Main
+    vf = shlex.quote(",".join(filters))
+
+    gop = max(1, round(fps))  # keyframe about every second
+
+    def build_command(audio_opts):
+        return (
+            f"ffmpeg -nostdin -hide_banner -i {shlex.quote(str(inp_path))} "
+            f"-map 0:v:0 -map 0:a? -dn -sn "
+            f"-vf {vf} {color_opts}"
+            f"-c:v libx264 -profile:v main -bf 0 -g {gop} "
+            f"-b:v {max_video_bitrate_bps} -maxrate {max_video_bitrate_bps} "
+            f"-bufsize {2 * max_video_bitrate_bps} "
+            f"{audio_opts} -movflags +faststart "
+            f"{shlex.quote(str(out_path))} -y"
+        )
+
+    # Perform downscaling / re-encoding (fall back to AAC if audio can't be copied)
+    try:
+        try:
+            run_command(build_command("-c:a copy"))
+        except CommandError:
+            run_command(build_command("-c:a aac -b:a 160k"))
+    except Exception:
+        out_path.unlink(missing_ok=True)  # don't leave a broken partial file
+        raise
+
     new_size = out_path.stat().st_size
     new_bitrate = get_bitrate(out_path)
 
@@ -84,7 +176,10 @@ def downscale_video(inp_path, out_path, max_video_bitrate_bps):
     str_size = f"{original_size//1024}KiB->{new_size//1024}KiB"
     str_bitrate = f"{original_bitrate//1024}KBPS->{new_bitrate//1024}KBPS"
     str_bitrate_result = f"(BITRATE {generate_str_percentage(new_bitrate, max_video_bitrate_bps)})"
-    return f"Video scaled {str_file} {str_size}, {str_bitrate} {str_bitrate_result}"
+    str_res = f"{width}x{height}"
+    if downscaled:
+        str_res += f" (short side -> {short_side})"
+    return f"Video scaled {str_file} {str_res}, {str_size}, {str_bitrate} {str_bitrate_result}"
 
 
 def downscale_image(inp_path, out_path, max_image_size_bytes):
